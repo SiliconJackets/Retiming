@@ -29,6 +29,10 @@ volare ls-remote --pdk sky130
 - I am using commit `0fe599b2afb6708d281543108caf8310912f54af`
 
 The PDK should be stored under `~/.volare` if we do not include the `--pdf-root` command. However, that was used, change the PDK_ROOT parameter under notebook.py
+### Create ENV
+Create a `.env` file inside `Scripts` directory. Add `VOLARE_FOLDER="<[pdk_download_dir]>"`. 
+
+Example: `VOLARE_FOLDER="/home/ethanhuang03/.volare"`
 ## Files 
 1. `notebook.py` is a reproduction of [this notebook](https://colab.research.google.com/github/efabless/openlane2/blob/main/notebook.ipynb).
 2. `spm.v` is the Verilog file provided from [this notebook](https://colab.research.google.com/github/efabless/openlane2/blob/main/notebook.ipynb).

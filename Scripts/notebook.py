@@ -3,6 +3,7 @@ from openlane.config import Config
 from openlane.steps import Step
 from openlane.state import State
 import json
+import os
 
 
 class Metrics:
@@ -54,7 +55,7 @@ FILES = ["./verilog_files/spm.v"]
 Config.interactive(
     "spm",
     PDK="sky130A",
-    PDK_ROOT="/home/ethanhuang03/.volare",  # change it to whatever.
+    PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
     CLOCK_PORT="clk",
     CLOCK_NET="clk",
     CLOCK_PERIOD=10,
