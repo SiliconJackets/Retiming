@@ -6,7 +6,9 @@ Run the command to install NIX.
 bash <(curl -L https://nixos.org/nix/install)
 ```
 ### Clone OpenLane2
-Already done when cloning this repository.
+```
+git submodule update --init --recursive
+```
 ### Install and Run OpenLane2
 ```
 cd openlane2
