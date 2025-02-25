@@ -17,6 +17,10 @@ nix-shell
 The first time might take around 10 minutes while binaries are pulled from the cache.
 
 To run openlane, `cd openlane2`, go into NIX shell (`nix-shell`), navigate to any other directory, and run `openlane`.
+### Install Some More Dependencies
+```
+nix-shell -p python3 python3Packages.python-dotenv
+```
 ### Download PDKs
 This assumes we are using sky130.
 ```
