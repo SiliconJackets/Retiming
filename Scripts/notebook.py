@@ -5,6 +5,8 @@ from openlane.state import State
 import json
 import os
 
+from dotenv import load_dotenv
+load_dotenv(".env")
 
 class Metrics:
     def __init__(self, json_file: str):
