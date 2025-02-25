@@ -49,6 +49,16 @@ sta::set_cmd_corner $corner
 
 set clocks [sta::sort_by_name [sta::all_clocks]]
 
+
+puts "%OL_CREATE_REPORT max_10_critical.rpt"
+puts "\n==========================================================================="
+puts "report_checks -path_delay max (Setup) -group_count 10"
+puts "============================================================================"
+puts "======================= [$corner name] Corner ===================================\n"
+report_checks -sort_by_slack -path_delay max -fields {slew cap input nets fanout} -format full_clock_expanded -group_count 10 -corner [$corner name]
+puts ""
+puts "%OL_END_REPORT"
+
 puts "%OL_CREATE_REPORT min.rpt"
 puts "\n==========================================================================="
 puts "report_checks -path_delay min (Hold)"
