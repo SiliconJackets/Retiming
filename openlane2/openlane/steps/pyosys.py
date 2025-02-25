@@ -337,7 +337,7 @@ class SynthesisCommon(VerilogStep):
             "SYNTH_AUTONAME",
             bool,
             "Generates names for netlist instances. This results in instance names that can be extremely long, but are more human-readable.",
-            default=False,
+            default=True,
         ),
         Variable(
             "SYNTH_STRATEGY",
