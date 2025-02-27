@@ -1,6 +1,6 @@
 `timescale 1ns / 1ps
 
-module array_multiplier_8bit_tb;
+module array_multiplier_tb;
   logic [7:0] A, B;  // Test inputs
   logic [15:0] Z_reg;   // Output product
   logic [15:0] Z;
@@ -10,7 +10,7 @@ module array_multiplier_8bit_tb;
   logic o_vld;
 
   // Instantiate the 8-bit array multiplier
-  array_multiplier_8b mul0 (
+  array_multiplier mul0 (
     .A(A),
     .B(B),
     .Z(Z),
@@ -27,7 +27,7 @@ module array_multiplier_8bit_tb;
         // Configure FSDB dumping
         $fsdbDumpon;
         $fsdbDumpfile("simulation.fsdb");
-        $fsdbDumpvars(0, array_multiplier_8bit_tb, "+mda", "+all", "+trace_process");
+        $fsdbDumpvars(0, array_multiplier_tb, "+mda", "+all", "+trace_process");
         $fsdbDumpMDA;
     end
 
