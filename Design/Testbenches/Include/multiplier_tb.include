@@ -1,2 +1,3 @@
 array_multiplier_tb.sv
+../lib/pipeline_stage.sv
 ../Multiplier/array_multiplier.sv
