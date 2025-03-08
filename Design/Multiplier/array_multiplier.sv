@@ -1,5 +1,5 @@
 /*
-8-bit Array Multiplier with Pipeline Support
+8-bit Array Multiplier with Pipeline Support for Multi-Cycle Operation
 
 Notes:
 - Registered inputs and outputs by default
@@ -7,16 +7,13 @@ Notes:
 - If each row summation is pipelined, then max sum stages is WIDTH - 1
 - If partial product generation is pipelined, then one stage
 - Thus, max # of stages is RegIn + PP Gen + WIDTH - 1 + RegOut
+- Does NOT handle concurrent operations, i.e. only one pair of inputs at once
 
 Status:
 - Partial products are fully pipelined
 - Valid signal is fully pipelined
 - Accepts variable number of pipeline stages (0-7)
 
-ToDo:
-  1. Fully pipeline Z_reg
-  2. Fully pipeline carry C
-  3. Fully piepline sum C
 */
 
 module half_adder(input a, b, output s, c);
@@ -32,8 +29,9 @@ endmodule
 module array_multiplier #(
   parameter WIDTH = 8,
   parameter NUM_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
-  parameter MASK = 7'h02,             // 1111111 -> pipeline each row sum
-  parameter ENABLE = 1
+  parameter MASK = 7'h01,             // 1111111 -> pipeline each row sum
+  parameter ENABLE = 1,
+  parameter INSTANCE_ID
 )(
   input logic clk,
   input logic rst,
@@ -41,8 +39,8 @@ module array_multiplier #(
   input logic [WIDTH-1:0] A,
   input logic [WIDTH-1:0] B,
   output logic o_valid,
-  output logic [WIDTH*2-1:0] Z_reg,
-  output logic [WIDTH*2-1:0] Z
+  output logic [WIDTH*2-1:0] Z_final
+  // output logic [WIDTH*2-1:0] Z
 );
 
   // Keep it as seven for now
@@ -60,6 +58,7 @@ module array_multiplier #(
   logic [WIDTH-1:0] P_reg[NUM_STAGES-1+REG_IN:0][WIDTH-1:0]; // Each stage acts as a row for now
   logic [54:0] C;      // Carry signals
   logic [43:0] S;      // Sum signals
+  logic [WIDTH*2-1:0] Z;
 
   // Maybe use countones?
   generate
@@ -253,6 +252,10 @@ module array_multiplier #(
           P_reg[i][j] <= 8'b0;  // Reset all rows of partial products to zero
         end
       end
+      // Also reset the valid signals
+      for (int i = NUM_STAGES-1+REG_IN+REG_OUT; i > 0; i = i - 1) begin
+        i_valid_r[i] <= '0;
+      end
     end else begin
       // Shift each row of partial products through the pipeline
       for (int stage = NUM_STAGES-1+REG_IN+REG_OUT; stage > 0; stage = stage - 1) begin
@@ -279,15 +282,12 @@ module array_multiplier #(
     if (i_valid_r[NUM_STAGES-1+REG_IN+REG_OUT]) begin
       //Z_reg[15:1] <= Z;
       // Z_reg[0] <= P_reg[7][0][0];
-      Z_reg <= Z;
+      Z_final <= Z;
       o_valid <= '1;
     end else begin
-      Z_reg <= 'x;
+      Z_final <= 'x;
       o_valid <= '0;
     end
   end
 
 endmodule
-
-
-
