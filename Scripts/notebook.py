@@ -8,6 +8,13 @@ import os
 from dotenv import load_dotenv
 load_dotenv(".env")
 
+### Make Changes here ###
+design_name = "aes_composite_enc"
+cwd_path = os.getcwd()
+design_path = f"{cwd_path}/verilog_files/{design_name}.v"
+## No changes bellow this line ###
+
+
 class Metrics:
     def __init__(self, json_file: str):
         # Load the JSON file
@@ -53,13 +60,13 @@ class CornerMetrics:
 '''
 CONFIGURATIONS
 '''
-FILES = ["./verilog_files/spm.v"]
+FILES = [design_path]
 Config.interactive(
-    "spm",
+    design_name,
     PDK="sky130A",
     PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
-    CLOCK_PORT="clk",
-    CLOCK_NET="clk",
+    CLOCK_PORT="CLK",
+    CLOCK_NET="CLK",
     CLOCK_PERIOD=10,
     PRIMARY_GDSII_STREAMOUT_TOOL="klayout",
 )
