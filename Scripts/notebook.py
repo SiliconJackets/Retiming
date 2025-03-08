@@ -9,11 +9,18 @@ from dotenv import load_dotenv
 load_dotenv(".env")
 
 ### Make Changes here ###
-design_name = "aes_composite_enc"
 cwd_path = os.getcwd()
-design_path = f"{cwd_path}/verilog_files/{design_name}.v"
+## Design Modules
+design_modules = ["array_multiplier"]
+design_paths = [f"{cwd_path}/../Design/Multiplier/{design_module}.sv" for design_module in design_modules]
+## Library Modules
+lib_modules = ["pipeline_stage"]
+lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
+## Clock pin name
+clock_pin = "clk"
+##Clock period
+clock_period = 1
 ## No changes bellow this line ###
-
 
 class Metrics:
     def __init__(self, json_file: str):
@@ -60,14 +67,14 @@ class CornerMetrics:
 '''
 CONFIGURATIONS
 '''
-FILES = [design_path]
+FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
-    design_name,
+    design_modules[0],
     PDK="sky130A",
     PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
-    CLOCK_PORT="CLK",
-    CLOCK_NET="CLK",
-    CLOCK_PERIOD=10,
+    CLOCK_PORT = clock_pin,
+    CLOCK_NET = clock_pin,
+    CLOCK_PERIOD = clock_period,
     PRIMARY_GDSII_STREAMOUT_TOOL="klayout",
 )
 
