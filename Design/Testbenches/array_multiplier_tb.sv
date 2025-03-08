@@ -2,19 +2,22 @@
 
 module array_multiplier_tb;
   logic [7:0] A, B;  // Test inputs
-  logic [15:0] Z_reg;   // Output product
+  logic [15:0] Z_final;   // Output product
   logic [15:0] Z;
+  logic [15:0] Z_reg [8:0];
   logic rst;
   logic clk;
   logic i_vld;
   logic o_vld;
+  parameter INSTANCE_ID = 4'b1;
 
   // Instantiate the 8-bit array multiplier
-  array_multiplier mul0 (
+  array_multiplier #(
+    .INSTANCE_ID(INSTANCE_ID)
+  ) mul0 (
     .A(A),
     .B(B),
-    .Z(Z),
-    .Z_reg(Z_reg),
+    .Z_final(Z_final),
     .clk(clk),
     .rst(rst),
     .i_valid(i_vld),
@@ -44,10 +47,12 @@ module array_multiplier_tb;
     i_vld = '1;
 
     A = 8'b11111111; B = 8'b11111111; #10; // 255 * 255 = 65025
-    //i_vld = '0;
+    // A = 8'b00001111; B = 8'b00001111; #50; // 15 * 15 = 225
+    @(posedge o_vld);
+    i_vld = '0; #10;
 
     // End simulation
-    #10000 $finish;
+    $finish;
 
   end
 
@@ -70,7 +75,9 @@ module array_multiplier_tb;
 
   // Monitor outputs
   initial @(posedge clk) begin
-    $monitor("Time=%0t | A=%b (%d) | B=%b (%d) | Z=%b (%d) | Z_reg=%b (%d) | Valid=%b", 
-             $time, A, A, B, B, Z, Z, Z_reg, Z_reg, o_vld);
+    // $monitor("Time=%0t | A=%b (%d) | B=%b (%d) | Z=%b (%d) | Z_f=%b (%d) | Z_r=%b (%d) | Valid=%b", 
+    //          $time, A, A, B, B, Z, Z, Z_final, Z_final, Z_reg[2], Z_reg[2], o_vld);
+    $monitor("Time=%0t | A=%b (%d) | B=%b (%d) | Z=%b (%d) | Valid=%b", 
+             $time, A, A, B, B, Z_final, Z_final, o_vld);
   end
 endmodule
