@@ -32,7 +32,7 @@ endmodule
 module array_multiplier #(
   parameter DATAWIDTH = 8,
   parameter NUM_PIPELINE_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
-  parameter INSTANCE_ID
+  parameter INSTANCE_ID = 0
 )(
   input logic clk,
   input logic rst,
