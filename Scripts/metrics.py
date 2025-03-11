@@ -120,6 +120,55 @@ class TimingRptParserAll:
                 self.timing_rpt = f.read()
         self.paths = []  # List to store parsed path information
 
+    def __parse_table(self, table: str):
+        def parse_line(line):
+            """Extracts fields from a line based on the computed column boundaries."""
+            fields = {}
+            for key, (start, end) in cols.items():
+                val = line[start:] if end == -1 else line[start:end]
+                val = val.strip()
+                fields[key] = val if val != "" else None
+            return fields
+        
+        lines = table.strip().splitlines()
+        header_line = lines[0]
+        cols = {
+            "Fanout": (header_line.index("Fanout"), header_line.index("Fanout") + len("Fanout")),
+            "Cap": (header_line.index("Fanout") + len("Fanout"), header_line.index("Cap") + len("Cap")),
+            "Slew": (header_line.index("Cap") + len("Cap"), header_line.index("Slew") + len("Slew")),
+            "Delay": (header_line.index("Slew") + len("Slew"), header_line.index("Delay") + len("Delay")),
+            "Time": (header_line.index("Delay") + len("Delay"), header_line.index("Time") + len("Time")),
+            "Description": (header_line.index("Time") + len("Time"), -1),
+        }
+
+        rows = []
+        current_row = None
+        data_lines = lines[1:]
+
+        for line in data_lines:
+            line = line.rstrip()
+            if set(line.strip()) == {"-"}:
+                continue
+            
+            parsed = parse_line(line)
+            if (parsed["Fanout"] is None and parsed["Cap"] is None and parsed["Slew"] is None and 
+                parsed["Delay"] is None and parsed["Time"] is None and parsed["Description"] is not None):
+                if current_row is not None:
+                    current_row["Description"] += " " + parsed["Description"]
+                continue   
+            current_row = parsed
+            rows.append(current_row)
+
+        for row in rows:
+            for col in ["Fanout", "Cap", "Slew", "Delay", "Time"]:
+                if row[col] is not None:
+                    try:
+                        row[col] = float(row[col])
+                    except ValueError:
+                        pass
+
+        return rows              
+
     def parse(self):
         """
         Parse the file content to capture all information from each path block.
@@ -166,7 +215,7 @@ class TimingRptParserAll:
             entry['path_type'] = pathtype_match.group(1).strip() if pathtype_match else ""
 
             table_match = re.search(r'(Fanout.*?)(?=^\s*[-\d\.]+\s+slack|\Z)', block, re.DOTALL | re.MULTILINE)
-            entry['table'] = table_match.group(1).strip() if table_match else ""
+            entry['table'] = self.__parse_table(table_match.group(1).strip() if table_match else "")
 
             slack_match = re.findall(r'^\s*([-\d\.]+)\s+slack', block, re.MULTILINE)
             if slack_match:
