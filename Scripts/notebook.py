@@ -12,8 +12,8 @@ from metrics import TimingRptParser
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-design_modules = ["spm"]
-design_paths = [f"{cwd_path}/verilog_files/{design_module}.v" for design_module in design_modules]
+design_modules = ["array_multiplier"]
+design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules]
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
