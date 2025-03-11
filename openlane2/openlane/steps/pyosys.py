@@ -415,7 +415,7 @@ class SynthesisCommon(VerilogStep):
             "SYNTH_HIERARCHY_MODE",
             Literal["flatten", "deferred_flatten", "keep"],
             "Affects how hierarchy is maintained throughout and after synthesis. 'flatten' flattens it during and after synthesis. 'deferred_flatten' flattens it after synthesis. 'keep' never flattens it.",
-            default="flatten",
+            default="keep",
             deprecated_names=[
                 (
                     "SYNTH_NO_FLAT",
