@@ -1,24 +1,3 @@
-/*
-8-bit Array Multiplier with Pipeline Support
-
-Notes:
-- Registered inputs and outputs by default
-  - Minimum of three stages
-- If each row summation is pipelined, then max sum stages is WIDTH - 1
-- If partial product generation is pipelined, then one stage
-- Thus, max # of stages is RegIn + PP Gen + WIDTH - 1 + RegOut
-
-Status:
-- Partial products are fully pipelined
-- Valid signal is fully pipelined
-- Accepts variable number of pipeline stages (0-7)
-
-ToDo:
-  1. Fully pipeline Z_reg
-  2. Fully pipeline carry C
-  3. Fully piepline sum C
-*/
-
 module half_adder(input a, b, output s, c);
   assign s = a ^ b;
   assign c = a & b;
@@ -32,7 +11,7 @@ endmodule
 module array_multiplier #(
   parameter DATAWIDTH = 4,
   parameter NUM_PIPELINE_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
-  parameter INSTANCE_ID = 0
+  parameter INSTANCE_ID
 )(
   input logic clk,
   input logic rst,
@@ -43,54 +22,39 @@ module array_multiplier #(
   output logic [DATAWIDTH*2-1:0] Z_final
 );
 
-  localparam PIPELINE_STAGE_MASK = 7'h0F;
+  localparam STAGE_MASK_WIDTH = DATAWIDTH + 2;
+  //localparam PIPELINE_STAGE_MASK = {STAGE_MASK_WIDTH{1'b0}} | ((1 << NUM_PIPELINE_STAGES) - 1);
+  localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}};
 
-  logic [DATAWIDTH-1:0] A0, B0, A1,B1;
-  logic [DATAWIDTH*DATAWIDTH-1:0] P [10:0];  // Two pipeline stages
-  logic [DATAWIDTH-2:0] C [10:0];
-  logic [DATAWIDTH-3:0] S [10:0];
-  logic [2*DATAWIDTH-1:0] Z [10:0];
-  logic valid [10:0];
+  logic [DATAWIDTH-1:0] A_reg, B_reg,A_reg_wire, B_reg_wire;
 
-  assign A0 = (i_valid) ? A : '0;
-  assign B0 = (i_valid) ? B : '0; 
-  
-  pipeline_stage #(
-    .WIDTH($bits({A0,B0,i_valid})),
-    .ENABLE(PIPELINE_STAGE_MASK[0])
-  )
-  pipeline0 (
-    .clk(clk),
-    .rst(rst),
-    .data_in({A0,B0,i_valid}),
-    .data_out({A1,B1,valid[0]}) 
-  );
+  // Figure out a way to reduce this for now keeping this as is 
+  logic [DATAWIDTH*DATAWIDTH-1:0] P [DATAWIDTH:0];  // Two pipeline stages
+  logic [DATAWIDTH-2:0] C [2*DATAWIDTH-2:0];
+  logic [DATAWIDTH-3:0] S [2*DATAWIDTH-3:0];
+  logic [2*DATAWIDTH-1:0] Z [2*DATAWIDTH:0];// [2*DATAWIDTH]
+  logic valid [STAGE_MASK_WIDTH-1];
 
   genvar i, j;
+
+  // Assign A_reg_wire and B_reg_wire based on valid 
+  assign A_reg_wire = (valid[0]) ? A_reg : '0;
+  assign B_reg_wire = (valid[0]) ? B_reg : '0; 
+
+  // Generate all partial products 
   generate
     for (i = 0; i < DATAWIDTH; i = i + 1) begin
       for (j = 0; j < DATAWIDTH; j = j + 1) begin
-        assign P[0][i*DATAWIDTH + j] = A1[i] & B1[j];
+        assign P[0][i*DATAWIDTH + j] = A_reg_wire[i] & B_reg_wire[j];
       end
     end
   endgenerate
 
-  assign Z[0][0] = P[0][0*DATAWIDTH + 0] ; 
-  
-  pipeline_stage #(
-    .WIDTH($bits({P[0],Z[0],valid[0]})),
-    .ENABLE(PIPELINE_STAGE_MASK[1])
-  )
-  pipeline1 (
-    .clk(clk),
-    .rst(rst),
-    .data_in({P[0],Z[0],valid[0]}),
-    .data_out({P[1],Z[1],valid[1]}) 
-  );
- 
-   
+  assign Z[0][0] = P[0][0*DATAWIDTH + 0]; 
+
+  // Generate first HA array 
   generate
-    for (i = 0; i < DATAWIDTH - 1; i = i + 1) begin : HA_INST_i
+    for (i = 0; i < DATAWIDTH - 1; i = i + 1) begin : HA_only_row
       logic s_wire_ha;
       if (i == 0)
           assign Z[2] = (Z[1] & ~(1'b1 << 1)) | (s_wire_ha << 1);
@@ -104,26 +68,12 @@ module array_multiplier #(
         .c(C[0][i]) 
       );
     end
-  endgenerate
+  endgenerate  
 
+  // Generate multiple rows and columns of full adders only 
   generate
-    for (i = 0; i < DATAWIDTH - 1; i = i + 1) begin : PIPE_INST_i
-      pipeline_stage #(
-        .WIDTH($bits({P[i+1],C[2*i],S[2*i],Z[2*(i+1)],valid[1+i]})),
-        .ENABLE(PIPELINE_STAGE_MASK[i+2])
-      )
-      pipeline (
-        .clk(clk),
-        .rst(rst),
-        .data_in({P[i+1],C[2*i],S[2*i],Z[2*(i+1)],valid[1+i]}),
-        .data_out({{P[i+2],C[2*i+1],S[2*i+1],Z[2*(i+1)+1],valid[2+i]}}) 
-      );
-    end
-  endgenerate
-
-  generate
-      for (i = 0; i < DATAWIDTH - 2; i = i + 1) begin : FA_INST_i
-          for (j = 0; j < DATAWIDTH - 1; j = j + 1) begin : FA_INST_j
+      for (i = 0; i < DATAWIDTH - 2; i = i + 1) begin : FA_only_col
+          for (j = 0; j < DATAWIDTH - 1; j = j + 1) begin : FA_only_row
               logic cin_wire;
               logic s_wire_fa;
 
@@ -146,12 +96,9 @@ module array_multiplier #(
           end
       end
   endgenerate
-
-  assign Z[2*(DATAWIDTH-1)+2][DATAWIDTH -1 : 0] = Z[2*(DATAWIDTH-1)+1][DATAWIDTH -1 : 0];
-  assign Z[2*(DATAWIDTH-1)+2][2*DATAWIDTH - 1] = C[2*(DATAWIDTH - 2) + 2][DATAWIDTH - 2];
-  assign Z_final = Z[2*(DATAWIDTH-1)+2];
-  assign o_valid = valid[DATAWIDTH];
-  generate
+  
+  // Generate the last row 
+    generate
     for (i = 0; i < DATAWIDTH - 1; i = i + 1) begin : HAFA_INST_i
       logic cin_wire_hafa;
       logic s_wire_hafa;
@@ -180,4 +127,84 @@ module array_multiplier #(
     end
   endgenerate
 
+  assign Z[2*DATAWIDTH][DATAWIDTH - 1 : 0] = Z[2*(DATAWIDTH-1)+1][DATAWIDTH -1 : 0];
+  assign Z[2*DATAWIDTH][2*DATAWIDTH - 1] = C[2*(DATAWIDTH - 2) + 2][DATAWIDTH - 2];
+
+  // Generate all pipeline stages 
+  generate
+    for (i = 0; i < STAGE_MASK_WIDTH; i = i + 1) begin : multiplier_pipeline_stage
+      
+      if (i == 0) begin 
+
+        logic [2*DATAWIDTH:0] input_stage, output_stage; 
+
+        assign input_stage = {A,B,i_valid};
+        assign {A_reg,B_reg,valid[0]} = output_stage;
+
+        pipeline_stage #(
+          .WIDTH($bits(input_stage)),
+          .ENABLE(PIPELINE_STAGE_MASK[i])
+        )
+        pipeline_inst (
+          .clk(clk),
+          .rst(rst),
+          .data_in(input_stage),
+          .data_out(output_stage) 
+        );   
+
+      end else if (i == 1) begin
+        logic [DATAWIDTH*DATAWIDTH + 2*DATAWIDTH + 1 - 1:0] input_stage, output_stage; 
+        
+        assign input_stage = {P[0],Z[0],valid[0]};
+        assign {P[1], Z[1], valid[1]} = output_stage; 
+      
+        pipeline_stage #(
+          .WIDTH($bits(input_stage)),
+          .ENABLE(PIPELINE_STAGE_MASK[i])
+        )
+        pipeline_inst (
+          .clk(clk),
+          .rst(rst),
+          .data_in(input_stage),
+          .data_out(output_stage) 
+        );  
+      
+      end else if (i == STAGE_MASK_WIDTH - 1) begin
+
+        logic [2*DATAWIDTH + 1 - 1:0] input_stage, output_stage; 
+        
+        assign input_stage = {Z[2*DATAWIDTH],valid[i-1]};
+        assign {Z_final, o_valid} = output_stage; 
+      
+        pipeline_stage #(
+          .WIDTH($bits(input_stage)),
+          .ENABLE(PIPELINE_STAGE_MASK[i])
+        )
+        pipeline_inst (
+          .clk(clk),
+          .rst(rst),
+          .data_in(input_stage),
+          .data_out(output_stage) 
+        ); 
+
+      end else begin
+        logic [DATAWIDTH*DATAWIDTH + 2*DATAWIDTH + 1 + DATAWIDTH - 1 + DATAWIDTH - 2 - 1:0] input_stage, output_stage; 
+        
+        assign input_stage = {P[i-1], C[2*(i-2)], S[2*(i-2)], Z[2*(i-1)], valid[i-1]};
+        assign {P[i], C[2*(i-2)+1], S[2*(i-2)+1], Z[2*(i-1) + 1], valid[i]} = output_stage; 
+      
+        pipeline_stage #(
+          .WIDTH($bits(input_stage)),
+          .ENABLE(PIPELINE_STAGE_MASK[i])
+        )
+        pipeline_inst (
+          .clk(clk),
+          .rst(rst),
+          .data_in(input_stage),
+          .data_out(output_stage) 
+        );  
+      end
+         
+    end
+  endgenerate
 endmodule
