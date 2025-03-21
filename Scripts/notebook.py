@@ -12,7 +12,8 @@ from metrics import TimingRptParser
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-design_modules = ["array_multiplier"]
+top_module = "array_multiplier_top"
+design_modules = [top_module, "array_multiplier"]
 design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules]
 ## Library Modules
 lib_modules = ["pipeline_stage"]
@@ -28,7 +29,7 @@ CONFIGURATIONS
 '''
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
-    design_modules[0],
+    top_module,
     PDK="sky130A",
     PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
     CLOCK_PORT = clock_pin,
@@ -67,4 +68,5 @@ sta_pre_pnr.start()
 # Parse Timing Data.
 metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")
 metrics.parse()
-print(metrics.get_paths())
+for i in metrics.get_paths():
+    print(i)

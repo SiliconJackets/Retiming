@@ -1,6 +1,11 @@
 `timescale 1ns / 1ps
  
-module array_multiplier_top(
+module array_multiplier_top #(
+  parameter DATAWIDTH = 4,
+  parameter NUM_PIPELINE_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
+  parameter INSTANCE_ID = 0 
+  )
+  (
   input logic clk,
   input logic rst,
   input logic i_valid,
@@ -9,20 +14,12 @@ module array_multiplier_top(
   output logic o_valid,
   output logic [DATAWIDTH*2-1:0] Z_final
 );
-  localparam TESTDATAWIDTH = 16;
-
-  // logic [TESTDATAWIDTH-1:0] A, B;  // Test inputs
-  // logic [2*TESTDATAWIDTH-1:0] Z;   // Output product
-  // logic rst;
-  // logic clk;
-  // logic i_vld;
-  // logic o_vld;
  
   // Instantiate the 8-bit array multiplier
   array_multiplier #(
-    .DATAWIDTH(TESTDATAWIDTH),
-    .NUM_PIPELINE_STAGES(2),
-    .INSTANCE_ID(0)
+    .DATAWIDTH(DATAWIDTH),
+    .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES),
+    .INSTANCE_ID(INSTANCE_ID)
   )
   mul0 (
     .A(A),
