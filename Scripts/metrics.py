@@ -43,6 +43,39 @@ class StateOutCornerMetrics:
         return str(self.metrics)
 
 
+class InstanceDetails:
+    '''
+    Value Interpretation:
+    - next=InstanceDetails(module=None, instance_name=None, pipeline_stage=None, next=None, slack=None, violated=None) indicates OUTPUT.
+    - InstanceDetails(module=None, instance_name=None, pipeline_stage=None, next=InstanceDetails(...), slack=..., violated=...) indicates INPUT.
+    - InstanceDetails(..., next=InstanceDetails(..., next=None, slack=None, violated=None), slack=..., violated=...) indicates INTRA-PIPELINE STAGE.
+        - We don't care about next InstanceDetails slack and violated values, since they are not the final output.
+    '''
+    def __init__(self, string, next=None, slack=None, violated=None):
+        self.module, self.instance_name, self.pipeline_stage = self.pattern_match(string)
+        self.next = InstanceDetails(next) if next else None
+        self.slack = slack
+        self.violated = violated
+
+    def pattern_match(self, string):
+        pattern = r'/([^/_]+)_pipeline_stage'
+        match = re.search(pattern, string)
+        if match:
+            module = match.group(1)
+            instance_name = string[:string.find(f"/{module}")]
+            pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
+            match = re.search(pattern, string)
+            pipeline_stage = int(match.group('number'))
+        else:
+            module = None
+            instance_name = None
+            pipeline_stage = None
+        return module, instance_name, pipeline_stage
+
+    def __repr__(self):
+        return f"InstanceDetails(module={self.module}, instance_name={self.instance_name}, pipeline_stage={self.pipeline_stage}, next={self.next}, slack={self.slack}, violated={self.violated})"
+    
+
 class TimingRptParser:
     def __init__(self, timing_rpt: str = None):
         """
@@ -55,6 +88,8 @@ class TimingRptParser:
             with open(timing_rpt, 'r') as f:
                 self.timing_rpt = f.read()
         self.paths = []  # List to store parsed path information
+
+        self.parse()
 
     def parse(self):
         """
@@ -105,8 +140,15 @@ class TimingRptParser:
         """
         return self.paths
 
+    def get_instance_details(self):
+        instance_details = []
+        for path in self.paths:
+            details = InstanceDetails(path["startpoint"], path["endpoint"], path["slack"], path["violated"])
+            instance_details.append(details)
+        
+        return instance_details
 
-# TODO: Instead of saving "table" as a raw string, parse it into a more structured format.
+
 class TimingRptParserAll:
     def __init__(self, timing_rpt: str = None):
         """
@@ -119,6 +161,8 @@ class TimingRptParserAll:
             with open(timing_rpt, 'r') as f:
                 self.timing_rpt = f.read()
         self.paths = []  # List to store parsed path information
+
+        self.parse()
 
     def __parse_table(self, table: str):
         def parse_line(line):
@@ -236,3 +280,11 @@ class TimingRptParserAll:
         Return a list of dictionaries with all captured information for each path.
         """
         return self.paths
+    
+    def get_instance_details(self):
+        instance_details = []
+        for path in self.paths:
+            details = InstanceDetails(path["startpoint"], path["endpoint"], path["slack"], path["violated"])
+            instance_details.append(details)
+        
+        return instance_details

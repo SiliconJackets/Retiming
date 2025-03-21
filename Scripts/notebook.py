@@ -3,18 +3,20 @@ from openlane.config import Config
 from openlane.steps import Step
 from openlane.state import State
 import os
-
+from metrics import TimingRptParser
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-from metrics import TimingRptParser
 
+'''
+CONFIGURATIONS
+'''
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-top_module = "array_multiplier_top"
-design_modules = [top_module, "array_multiplier"]
-design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules]
+top_module = ["array_multiplier_top"]
+design_modules = ["array_multiplier"]
+design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules+top_module]
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
@@ -22,14 +24,10 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 clock_pin = "clk"
 ##Clock period
 clock_period = 1
-## No changes bellow this line ###
 
-'''
-CONFIGURATIONS
-'''
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
-    top_module,
+    top_module[0],  # Assume first element of top_module list is the top module
     PDK="sky130A",
     PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
     CLOCK_PORT = clock_pin,
@@ -37,15 +35,18 @@ Config.interactive(
     CLOCK_PERIOD = clock_period,
     PRIMARY_GDSII_STREAMOUT_TOOL="klayout",
 )
+## No changes bellow this line ###
 
 '''
 AVAILABLE STEPS
 '''
-# Print the version of OpenLANE
-print(f"Openlane2 Version: {openlane.__version__}")
-# List all available steps
-available_steps = Step.factory.list()
-print(available_steps)
+def print_available_steps():
+    print(f"Openlane2 Version: {openlane.__version__}")
+    print("Available Steps:")
+    for step in Step.factory.list():
+        print(step)
+
+print_available_steps()
 
 '''
 SYNTHESIS
@@ -66,7 +67,11 @@ sta_pre_pnr = STAPrePNR(
 sta_pre_pnr.start()
 
 # Parse Timing Data.
-metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")
-metrics.parse()
-for i in metrics.get_paths():
-    print(i)
+metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")  # nom_ff_n40C_1v95, nom_ss_100C_1v60, nom_tt_025C_1v80
+instance_details = metrics.get_instance_details()
+
+print("Instance Details:")
+for details in instance_details:
+    print(details)
+
+
