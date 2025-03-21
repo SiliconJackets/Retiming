@@ -70,8 +70,26 @@ sta_pre_pnr.start()
 metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")  # nom_ff_n40C_1v95, nom_ss_100C_1v60, nom_tt_025C_1v80
 instance_details = metrics.get_instance_details()
 
+
+def file_finder(string, file_list):
+    '''
+    Given a string and a list of files, return the file that contains the string
+    '''
+    for file in file_list:
+        with open(file, 'r') as f:
+            if string in f.read():
+                return file
+    return None
+
+
 print("Instance Details:")
 for details in instance_details:
     print(details)
+    if details.instance_name is not None:
+        instance_file_location = file_finder(details.instance_name, design_paths + lib_paths)
+        print(f"\t Instance File: {instance_file_location}")
+    if details.module is not None:
+        module_file_location = file_finder(f"{details.module}", design_paths + lib_paths)
+        print(f"\t Module File: {module_file_location}")
 
 
