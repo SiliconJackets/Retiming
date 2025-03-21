@@ -11,7 +11,7 @@ endmodule
 module array_multiplier #(
   parameter DATAWIDTH = 4,
   parameter NUM_PIPELINE_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
-  parameter INSTANCE_ID
+  parameter INSTANCE_ID = 0 
 )(
   input logic clk,
   input logic rst,
@@ -25,7 +25,7 @@ module array_multiplier #(
   localparam STAGE_MASK_WIDTH = DATAWIDTH + 2;
   //localparam PIPELINE_STAGE_MASK = {STAGE_MASK_WIDTH{1'b0}} | ((1 << NUM_PIPELINE_STAGES) - 1);
   localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}};
-
+   localparam PIPELINE_STAGE_MASK = 6'010000;
   logic [DATAWIDTH-1:0] A_reg, B_reg,A_reg_wire, B_reg_wire;
 
   // Figure out a way to reduce this for now keeping this as is 
