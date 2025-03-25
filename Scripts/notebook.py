@@ -66,10 +66,6 @@ sta_pre_pnr = STAPrePNR(
 )
 sta_pre_pnr.start()
 
-# Parse Timing Data.
-metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")  # nom_ff_n40C_1v95, nom_ss_100C_1v60, nom_tt_025C_1v80
-instance_details = metrics.get_instance_details()
-
 
 def file_finder(string, file_list):
     '''
@@ -82,14 +78,42 @@ def file_finder(string, file_list):
     return None
 
 
+def find_pipeline_stage(module, top_module):
+    '''
+    Returns how many pipeline stages are there in the module
+    '''
+    with open(f"./openlane_run/1-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
+        data = f.read()
+    mask = f"{module}_pipeline_stage"
+    print(mask)
+    # Find the line that contains string in the file add line to python set
+    lines = set()
+    for i, line in enumerate(data.split('\n')):
+        if mask in line:
+            pipeline_stage = line[line.find(module):line.find("]")+1]
+            lines.add(pipeline_stage)
+    
+    return len(lines)
+
+    
+# Parse Timing Data.
+# TODO: Read StateOutMetrics and see if there are any timing violations. If there are, then we parse timing report for that corner/group.
+metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")  # nom_ff_n40C_1v95, nom_ss_100C_1v60, nom_tt_025C_1v80
+instance_details = metrics.get_instance_details()
+
 print("Instance Details:")
 for details in instance_details:
     print(details)
-    if details.instance_name is not None:
+    if details.instance_name is not None and details.module is not None:  # Not an input
         instance_file_location = file_finder(details.instance_name, design_paths + lib_paths)
-        print(f"\t Instance File: {instance_file_location}")
-    if details.module is not None:
         module_file_location = file_finder(f"{details.module}", design_paths + lib_paths)
+        num_pipeline_stages = find_pipeline_stage(details.module, top_module[0])
+        print(f"\t Instance File: {instance_file_location}")
         print(f"\t Module File: {module_file_location}")
+        print(f"\t Pipeline Stages: {num_pipeline_stages}")
+
+    
+
+
 
 
