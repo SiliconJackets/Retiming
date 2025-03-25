@@ -41,23 +41,13 @@ class StateOutCornerMetrics:
 
     def __repr__(self):
         return str(self.metrics)
-
+    
 
 class InstanceDetails:
-    '''
-    Value Interpretation:
-    - next=InstanceDetails(module=None, instance_name=None, pipeline_stage=None, next=None, slack=None, violated=None) indicates OUTPUT.
-    - InstanceDetails(module=None, instance_name=None, pipeline_stage=None, next=InstanceDetails(...), slack=..., violated=...) indicates INPUT.
-    - InstanceDetails(..., next=InstanceDetails(..., next=None, slack=None, violated=None), slack=..., violated=...) indicates INTRA-PIPELINE STAGE.
-        - We don't care about next InstanceDetails slack and violated values, since they are not the final output.
-    '''
-    def __init__(self, string, next=None, slack=None, violated=None):
-        self.module, self.instance_name, self.pipeline_stage = self.pattern_match(string)
-        self.next = InstanceDetails(next) if next else None
-        self.slack = slack
-        self.violated = violated
+    def __init__(self, string, startpoint=True):
+        self.module, self.instance_name, self.pipeline_stage = self.pattern_match(string, startpoint)
 
-    def pattern_match(self, string):
+    def pattern_match(self, string, startpoint=True):
         pattern = r'/([^/_]+)_pipeline_stage'
         match = re.search(pattern, string)
         if match:
@@ -66,15 +56,19 @@ class InstanceDetails:
             pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
             match = re.search(pattern, string)
             pipeline_stage = int(match.group('number'))
+        elif startpoint:
+            module = "INPUT"
+            instance_name = "INPUT"
+            pipeline_stage = None
         else:
-            module = None
-            instance_name = None
+            module = "OUTPUT"
+            instance_name = "OUTPUT"
             pipeline_stage = None
         return module, instance_name, pipeline_stage
-
-    def __repr__(self):
-        return f"InstanceDetails(module={self.module}, instance_name={self.instance_name}, pipeline_stage={self.pipeline_stage}, next={self.next}, slack={self.slack}, violated={self.violated})"
     
+    def __repr__(self):
+        return f"InstanceDetails(module={self.module}, instance_name={self.instance_name}, pipeline_stage={self.pipeline_stage})"
+
 
 class TimingRptParser:
     def __init__(self, timing_rpt: str = None):
@@ -143,26 +137,21 @@ class TimingRptParser:
     def get_instance_details(self):
         instance_details = []
         for path in self.paths:
-            details = InstanceDetails(path["startpoint"], path["endpoint"], path["slack"], path["violated"])
-            instance_details.append(details)
+            startpoint = InstanceDetails(path["startpoint"], startpoint=True)
+            endpoint = InstanceDetails(path["endpoint"], startpoint=False)
+            instance_details.append({"startpoint":startpoint, "endpoint":endpoint, "slack":path["slack"], "violated":path["violated"]})
         
         return instance_details
 
 
-class TimingRptParserAll:
+class TimingRptParserAll(TimingRptParser):
     def __init__(self, timing_rpt: str = None):
         """
         Initialize the parser with the contents of a max report file.
+        Inherits initialization from TimingRptParser and adds additional parsing.
         :param timing_rpt: The .rpt file.
         """
-        if timing_rpt is None:
-            raise ValueError("No timing report file provided.")
-        else:
-            with open(timing_rpt, 'r') as f:
-                self.timing_rpt = f.read()
-        self.paths = []  # List to store parsed path information
-
-        self.parse()
+        super().__init__(timing_rpt)
 
     def __parse_table(self, table: str):
         def parse_line(line):
@@ -274,17 +263,3 @@ class TimingRptParserAll:
             entry['violated'] = (slack_value is not None and slack_value < 0)
 
             self.paths.append(entry)
-
-    def get_paths(self):
-        """
-        Return a list of dictionaries with all captured information for each path.
-        """
-        return self.paths
-    
-    def get_instance_details(self):
-        instance_details = []
-        for path in self.paths:
-            details = InstanceDetails(path["startpoint"], path["endpoint"], path["slack"], path["violated"])
-            instance_details.append(details)
-        
-        return instance_details

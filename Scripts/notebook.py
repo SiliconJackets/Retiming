@@ -85,7 +85,6 @@ def find_pipeline_stage(module, top_module):
     with open(f"./openlane_run/1-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
         data = f.read()
     mask = f"{module}_pipeline_stage"
-    print(mask)
     # Find the line that contains string in the file add line to python set
     lines = set()
     for i, line in enumerate(data.split('\n')):
@@ -102,15 +101,17 @@ metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/
 instance_details = metrics.get_instance_details()
 
 print("Instance Details:")
-for details in instance_details:
+for i, details in enumerate(instance_details):
+    module_file_location = ""
+    num_pipeline_stages = None
+
+    if details["startpoint"].module != "INPUT":
+        module_file_location = file_finder(details["startpoint"].module, design_paths + lib_paths)
+        num_pipeline_stages = find_pipeline_stage(details["startpoint"].module, top_module[0])
+    instance_details[i]["num_pipeline_stages"] = num_pipeline_stages
+
     print(details)
-    if details.instance_name is not None and details.module is not None:  # Not an input
-        instance_file_location = file_finder(details.instance_name, design_paths + lib_paths)
-        module_file_location = file_finder(f"{details.module}", design_paths + lib_paths)
-        num_pipeline_stages = find_pipeline_stage(details.module, top_module[0])
-        print(f"\t Instance File: {instance_file_location}")
-        print(f"\t Module File: {module_file_location}")
-        print(f"\t Pipeline Stages: {num_pipeline_stages}")
+    print(f"\t Module File: {module_file_location}\n")
 
     
 
