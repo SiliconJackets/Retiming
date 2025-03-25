@@ -15,6 +15,8 @@ module array_multiplier_top #(
   output logic [DATAWIDTH*2-1:0] Z_final
 );
  
+
+  logic [DATAWIDTH*2-1:0] Z1, Z2;
   // Instantiate the 8-bit array multiplier
   array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
@@ -24,12 +26,28 @@ module array_multiplier_top #(
   mul0 (
     .A(A),
     .B(B),
-    .Z_final(Z_final),
+    .Z_final(Z1),
     .clk(clk),
     .rst(rst),
     .i_valid(i_valid),
     .o_valid(o_valid)
   );
- 
 
+  // Instantiate the 8-bit array multiplier
+  array_multiplier #(
+    .DATAWIDTH(DATAWIDTH),
+    .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES),
+    .INSTANCE_ID(INSTANCE_ID)
+  )
+  mul1 (
+    .A(A),
+    .B(B),
+    .Z_final(Z2),
+    .clk(clk),
+    .rst(rst),
+    .i_valid(i_valid),
+    .o_valid(o_valid)
+  ); 
+
+  assign Z_final = Z1 + Z2;
 endmodule
