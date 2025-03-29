@@ -79,6 +79,18 @@ def file_finder(string, file_list):
     return None
 
 
+def modify_mask(file_path, mask):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+
+    with open(file_path, 'w') as file:
+        for line in lines:
+            if line.lstrip().startswith("localparam PIPELINE_STAGE_MASK"):
+                indent = line[:len(line) - len(line.lstrip())]
+                line = f"{indent}localparam PIPELINE_STAGE_MASK = {len(mask)}'b{mask};\n"
+            file.write(line)
+
+
 def find_pipeline_stage(instance_name, module, top_module):
     with open(f"./openlane_run/1-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
         data = json.load(f)
