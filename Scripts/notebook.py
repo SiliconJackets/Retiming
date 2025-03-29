@@ -3,6 +3,7 @@ from openlane.config import Config
 from openlane.steps import Step
 from openlane.state import State
 import os
+import json
 from metrics import TimingRptParser
 from dotenv import load_dotenv
 load_dotenv(".env")
@@ -78,51 +79,41 @@ def file_finder(string, file_list):
     return None
 
 
-def find_pipeline_stage(module, top_module):
-    '''
-    Returns how many pipeline stages are there in the module
-    '''
+def find_pipeline_stage(instance_name, module, top_module):
     with open(f"./openlane_run/1-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
-        data = f.read().split('\n')
-    mask = f"{module}_pipeline_stage"
-    # Find the line that contains string in the file add line to python set
-    lines = set()
-    for i, line in enumerate(data):
-        if mask in line:
-            pipeline_stage = line[line.find(module):line.find("]")+1]
-            lines.add(pipeline_stage)
-
-    counter = 0
-    pipeline_mask = ""
-    for i, line in enumerate(data):
-        if counter == len(lines):
-            break
-        if "ENABLE" in line:
-            counter += 1
-            pipeline_mask = line[-3]+pipeline_mask
-
-    return len(lines), pipeline_mask
-
+        data = json.load(f)
+    module_key = data["modules"][top_module]["cells"][instance_name]["type"]
     
+    mask = f"{module}_pipeline_stage"
+    module = data["modules"][module_key]["cells"]
+    pipeline_details = {key : value for key, value in module.items() if mask in key}
+
+    pipeline = set()
+    pipeline_mask = ""
+    for key in pipeline_details.keys():
+        pipeline_stage = key[key.find(mask):key.find("]")+1]
+        pipeline.add(pipeline_stage)
+        if "ENABLE" in pipeline_details[key]["type"]:
+            pipeline_mask = pipeline_details[key]["type"][-1]+pipeline_mask
+    num_pipelines = len(pipeline)
+
+    return num_pipelines, pipeline_mask
+    
+
 # Parse Timing Data.
 # TODO: Read StateOutMetrics and see if there are any timing violations. If there are, then we parse timing report for that corner/group.
 metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")  # nom_ff_n40C_1v95, nom_ss_100C_1v60, nom_tt_025C_1v80
 instance_details = metrics.get_instance_details()
-print(metrics.get_paths())
 
 print("Instance Details:")
 for i, details in enumerate(instance_details):
     module_file_location = ""
-    num_pipeline_stages = None
-    pipeline_mask = None
 
     if details["startpoint"].module != "INPUT":
-        num_pipeline_stages, pipeline_mask = find_pipeline_stage(details["startpoint"].module, top_module[0])
-    instance_details[i]["num_pipeline_stages"] = num_pipeline_stages
-    instance_details[i]["pipeline_mask"] = pipeline_mask
-
+        details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
+    if details["endpoint"].module != "OUTPUT":
+        details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0])
     print(details)
-    print()
 
 simplified = {}
 for item in instance_details:
@@ -135,6 +126,7 @@ for item in instance_details:
 
 simplified_data = list(simplified.values())
 
+print()
 for i in simplified_data:
     print(i)
 

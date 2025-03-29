@@ -46,6 +46,8 @@ class StateOutCornerMetrics:
 class InstanceDetails:
     def __init__(self, string, startpoint=True):
         self.module, self.instance_name, self.pipeline_stage = self.pattern_match(string, startpoint)
+        self.pipeline_mask = None
+        self.num_pipeline_stages = None
 
     def pattern_match(self, string, startpoint=True):
         pattern = r'/([^/_]+)_pipeline_stage'
@@ -67,7 +69,7 @@ class InstanceDetails:
         return module, instance_name, pipeline_stage
     
     def __repr__(self):
-        return f"InstanceDetails(module={self.module}, instance_name={self.instance_name}, pipeline_stage={self.pipeline_stage})"
+        return f"InstanceDetails(module={self.module}, instance_name={self.instance_name}, pipeline_stage={self.pipeline_stage}, pipeline_mask={self.pipeline_mask}, num_pipeline_stages={self.num_pipeline_stages})"
 
 
 class TimingRptParser:
