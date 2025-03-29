@@ -4,7 +4,7 @@ from openlane.steps import Step
 from openlane.state import State
 import os
 import json
-from metrics import TimingRptParser
+from metrics import TimingRptParser, StateOutMetrics
 from dotenv import load_dotenv
 load_dotenv(".env")
 
@@ -98,41 +98,57 @@ def find_pipeline_stage(instance_name, module, top_module):
     num_pipelines = len(pipeline)
 
     return num_pipelines, pipeline_mask
-    
+
+
+def get_register_metrics(condition):
+    metrics = TimingRptParser(f"./openlane_run/2-openroad-staprepnr/{condition}/max_10_critical.rpt") 
+    instance_details = metrics.get_instance_details()
+
+    print("Instance Details:")
+    for i, details in enumerate(instance_details):
+        module_file_location = ""
+
+        if details["startpoint"].module != "INPUT":
+            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
+        if details["endpoint"].module != "OUTPUT":
+            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0])
+        # print(details)
+
+    simplified = {}
+    for item in instance_details:
+        key = (item["startpoint"].module, item["endpoint"].module)
+        if key not in simplified:
+            simplified[key] = item.copy()
+        else:
+            simplified[key]["slack"] = min(simplified[key]["slack"], item["slack"])
+            simplified[key]["violated"] = simplified[key]["violated"] or item["violated"]
+    simplified_data = list(simplified.values())
+
+    for i in simplified_data:
+        module_file_location = file_finder(i["startpoint"].module, design_paths + lib_paths)
+        print(f"Module File: {module_file_location}")
+        print(i)
+        print()
+
 
 # Parse Timing Data.
-# TODO: Read StateOutMetrics and see if there are any timing violations. If there are, then we parse timing report for that corner/group.
-metrics = TimingRptParser("./openlane_run/2-openroad-staprepnr/nom_ff_n40C_1v95/max_10_critical.rpt")  # nom_ff_n40C_1v95, nom_ss_100C_1v60, nom_tt_025C_1v80
-instance_details = metrics.get_instance_details()
-
-print("Instance Details:")
-for i, details in enumerate(instance_details):
-    module_file_location = ""
-
-    if details["startpoint"].module != "INPUT":
-        details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
-    if details["endpoint"].module != "OUTPUT":
-        details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0])
-    print(details)
-
-simplified = {}
-for item in instance_details:
-    key = (item["startpoint"].module, item["endpoint"].module)
-    if key not in simplified:
-        simplified[key] = item.copy()
-    else:
-        simplified[key]["slack"] = min(simplified[key]["slack"], item["slack"])
-        simplified[key]["violated"] = simplified[key]["violated"] or item["violated"]
-
-simplified_data = list(simplified.values())
-
-print()
-for i in simplified_data:
-    print(i)
-
-
+stateout = StateOutMetrics("./openlane_run/2-openroad-staprepnr/state_out.json")
+if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
+    print("Timing Violated For nom_ss_100C_1v60")
+    get_register_metrics("nom_ss_100C_1v60")
+else:
+    print("Timing Passed For nom_ss_100C_1v60")
 '''
-# Only if not INPUT
-module_file_location = file_finder(details["startpoint"].module, design_paths + lib_paths)
-print(f"Module File: {module_file_location}\n")'
+# Disabled for now
+if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
+    print("Timing Violated For nom_tt_025C_1v80")
+    get_register_metrics("nom_tt_025C_1v80")
+else:
+    print("Timing Passed For nom_tt_025C_1v80")
+
+if stateout.nom_ff_n40C_1v95.metrics["timing__hold__ws"] < 0 or stateout.nom_ff_n40C_1v95.metrics["timing__setup__ws"] < 0:
+    print("Timing Violated For nom_ff_n40C_1v95")
+    get_register_metrics("nom_ff_n40C_1v95")
+else:
+    print("Timing Passed For nom_ff_n40C_1v95")
 '''
