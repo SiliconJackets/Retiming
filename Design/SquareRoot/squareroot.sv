@@ -61,7 +61,10 @@
 // endmodule
 
 // =========== Pipeline extension ===========
+/*
+Credit to https://projectf.io/posts/square-root-in-verilog/ for algorithm
 
+*/
 module sqrt_stage #(
     parameter DATAWIDTH = 8,
     parameter ENABLE = 1
