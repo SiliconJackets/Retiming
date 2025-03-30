@@ -64,6 +64,8 @@
 /*
 Credit to https://projectf.io/posts/square-root-in-verilog/ for algorithm
 
+Unsigned Square Root with Pipeline Support
+- Does not support fractional numbers
 */
 module sqrt_stage #(
     parameter DATAWIDTH = 8,
