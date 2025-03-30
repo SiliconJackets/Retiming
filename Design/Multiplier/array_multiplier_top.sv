@@ -36,8 +36,8 @@ module array_multiplier_top #(
   // Instantiate the 8-bit array multiplier
   array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
-    .NUM_PIPELINE_STAGES(2),
-    .INSTANCE_ID(INSTANCE_ID)
+    .NUM_PIPELINE_STAGES(3),
+    .INSTANCE_ID(2)
   )
   mul1 (
     .A(A),
