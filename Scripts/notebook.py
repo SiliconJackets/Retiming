@@ -79,16 +79,76 @@ def file_finder(string, file_list):
     return None
 
 
-def modify_mask(file_path, mask):
-    with open(file_path, 'r') as file:
-        lines = file.readlines()
+def update_pipeline_mask(instance_id, new_mask, file_path):
+    """
+    Updates (or adds) an instance case in the get_pipeline_mask function in the given file.
 
-    with open(file_path, 'w') as file:
-        for line in lines:
-            if line.lstrip().startswith("localparam PIPELINE_STAGE_MASK"):
-                indent = line[:len(line) - len(line.lstrip())]
-                line = f"{indent}localparam PIPELINE_STAGE_MASK = {len(mask)}'b{mask};\n"
-            file.write(line)
+    If a case for the given instance_id exists, its pipeline mask is updated.
+    Otherwise, a new case is inserted before the default case.
+
+    Parameters:
+      instance_id (int): The instance id to update or add.
+      new_mask (str): The pipeline mask assignment as a string
+                      (e.g., "{ {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}} }").
+      file_path (str): The path to the Verilog file.
+    """
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+
+    # Locate the get_pipeline_mask function block.
+    func_start = None
+    func_end = None
+    for i, line in enumerate(lines):
+        if "function automatic" in line and "get_pipeline_mask" in line:
+            func_start = i
+            break
+    if func_start is None:
+        raise Exception("get_pipeline_mask function not found.")
+
+    for i in range(func_start, len(lines)):
+        if "endfunction" in lines[i]:
+            func_end = i
+            break
+    if func_end is None:
+        raise Exception("endfunction not found for get_pipeline_mask.")
+
+    # Locate the case statement and the default line within the function block.
+    case_start = None
+    default_index = None
+    for i in range(func_start, func_end):
+        if "case" in lines[i] and "instance_id" in lines[i]:
+            case_start = i
+        if "default:" in lines[i]:
+            default_index = i
+            break
+    if case_start is None:
+        raise Exception("case (instance_id) not found in the function block.")
+    if default_index is None:
+        raise Exception("default: case not found in the function block.")
+
+    # Search for an existing instance case between the case statement and default.
+    instance_index = None
+    for i in range(case_start, default_index):
+        stripped = lines[i].strip()
+        # Check if line starts with the instance id followed by a colon.
+        if stripped.startswith(f"{instance_id}:"):
+            instance_index = i
+            break
+
+    # Prepare the new case line using the indent of the default line.
+    default_line = lines[default_index]
+    indent = default_line[:len(default_line) - len(default_line.lstrip())]
+    new_case_line = f"{indent}{instance_id}: get_pipeline_mask = {new_mask}; // THIS LINE WAS ADDED BY THE SCRIPT\n"
+
+    if instance_index is not None:
+        # Overwrite the existing line.
+        lines[instance_index] = new_case_line
+    else:
+        # Insert the new case line just before the default case.
+        lines.insert(default_index, new_case_line)
+
+    with open(file_path, 'w') as f:
+        f.writelines(lines)
 
 
 def find_pipeline_stage(instance_name, module, top_module):
@@ -98,18 +158,19 @@ def find_pipeline_stage(instance_name, module, top_module):
     
     mask = f"{module}_pipeline_stage"
     module = data["modules"][module_key]["cells"]
-    pipeline_details = {key : value for key, value in module.items() if mask in key}
 
-    pipeline = set()
+    datawidth = int(data["modules"][module_key]["parameter_default_values"]["DATAWIDTH"], 2)
+    num_pipelines = datawidth + 2
+    instance_id = int(data["modules"][module_key]["parameter_default_values"]["INSTANCE_ID"], 2)
+    num_enabled_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
+
+    pipeline_details = {key : value for key, value in module.items() if mask in key}
     pipeline_mask = ""
     for key in pipeline_details.keys():
-        pipeline_stage = key[key.find(mask):key.find("]")+1]
-        pipeline.add(pipeline_stage)
         if "ENABLE" in pipeline_details[key]["type"]:
             pipeline_mask = pipeline_details[key]["type"][-1]+pipeline_mask
-    num_pipelines = len(pipeline)
 
-    return num_pipelines, pipeline_mask
+    return num_pipelines, pipeline_mask, instance_id, num_enabled_pipeline_stages
 
 
 def get_register_metrics(condition):
@@ -121,11 +182,12 @@ def get_register_metrics(condition):
         module_file_location = ""
 
         if details["startpoint"].module != "INPUT":
-            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
-        if details["endpoint"].module != "OUTPUT":
-            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0])
-        # print(details)
+            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
 
+        if details["endpoint"].module != "OUTPUT":
+            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0])
+        # print(details)
+    # print()
     simplified = {}
     for item in instance_details:
         key = (item["startpoint"].module, item["endpoint"].module)
@@ -136,10 +198,17 @@ def get_register_metrics(condition):
             simplified[key]["violated"] = simplified[key]["violated"] or item["violated"]
     simplified_data = list(simplified.values())
 
-    for i in simplified_data:
-        module_file_location = file_finder(i["startpoint"].module, design_paths + lib_paths)
+    for data in simplified_data:
+        module_file_location = file_finder(data["startpoint"].module, design_paths + lib_paths)
         print(f"Module File: {module_file_location}")
-        print(i)
+        print(f"Data: {data}")
+        # Add or Update pipeline mask in module file. Current code just duplicates what it founds in the module file and writes it explicity to the case.
+        if data["startpoint"].module != "INPUT":
+            print(f"Updating {data['startpoint'].instance_id} with {data['startpoint'].pipeline_mask}")
+            update_pipeline_mask(data["startpoint"].instance_id, data["startpoint"].pipeline_mask, module_file_location)
+        if data["endpoint"].module != "OUTPUT":
+            print(f"Updating {data['endpoint'].instance_id} with {data['endpoint'].pipeline_mask}")
+            update_pipeline_mask(data["endpoint"].instance_id, data["endpoint"].pipeline_mask, module_file_location)
         print()
 
 
