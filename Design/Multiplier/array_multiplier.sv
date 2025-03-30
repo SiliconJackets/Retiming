@@ -23,9 +23,17 @@ module array_multiplier #(
 );
 
   localparam STAGE_MASK_WIDTH = DATAWIDTH + 2;
-  //localparam PIPELINE_STAGE_MASK = {STAGE_MASK_WIDTH{1'b0}} | ((1 << NUM_PIPELINE_STAGES) - 1);
-  localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}};
-  //localparam PIPELINE_STAGE_MASK = 6'b010010;
+
+  function automatic [STAGE_MASK_WIDTH-1:0] get_pipeline_mask(input integer instance_id);
+    begin
+      case (instance_id)
+        default: get_pipeline_mask = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},
+                                       {NUM_PIPELINE_STAGES{1'b1}} };
+      endcase
+    end
+  endfunction
+
+  localparam PIPELINE_STAGE_MASK = get_pipeline_mask(INSTANCE_ID);
   logic [DATAWIDTH-1:0] A_reg, B_reg,A_reg_wire, B_reg_wire;
 
   // Figure out a way to reduce this for now keeping this as is 
