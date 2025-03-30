@@ -1,0 +1,3 @@
+squareroot_tb.sv
+../lib/pipeline_stage.sv
+../SquareRoot/squareroot.sv
