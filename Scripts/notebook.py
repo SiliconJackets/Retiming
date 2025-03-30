@@ -4,6 +4,8 @@ from openlane.steps import Step
 from openlane.state import State
 import os
 import json
+import re
+
 from metrics import TimingRptParser, StateOutMetrics
 from dotenv import load_dotenv
 load_dotenv(".env")
@@ -79,76 +81,67 @@ def file_finder(string, file_list):
     return None
 
 
-def update_pipeline_mask(instance_id, new_mask, file_path):
+def modify_pipeline_mask(instance_id, custom_mask, file_path):
     """
-    Updates (or adds) an instance case in the get_pipeline_mask function in the given file.
-
-    If a case for the given instance_id exists, its pipeline mask is updated.
-    Otherwise, a new case is inserted before the default case.
-
+    Modifies the PIPELINE_STAGE_MASK localparam in the given file.
+    
+    If a branch for (INSTANCE_ID == instance_id) exists in the mask, its mask
+    is replaced with custom_mask. If it doesn't exist, a new branch is added 
+    right after the equals sign.
+    
+    Example:
+      For instance_id=1 and custom_mask="{ {STAGE_MASK_WIDTH-2{1'b0}}, 2'b11 }", 
+      the line:
+      
+        localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},
+                                            {NUM_PIPELINE_STAGES{1'b1}} };
+      
+      will be transformed to:
+      
+        localparam PIPELINE_STAGE_MASK = (INSTANCE_ID == 1) ? { {STAGE_MASK_WIDTH-2{1'b0}}, 2'b11 } : { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},
+                                            {NUM_PIPELINE_STAGES{1'b1}} };
+    
     Parameters:
-      instance_id (int): The instance id to update or add.
-      new_mask (str): The pipeline mask assignment as a string
-                      (e.g., "{ {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}} }").
-      file_path (str): The path to the Verilog file.
+      instance_id (int or str): The instance id to update/insert.
+      custom_mask (str): The custom mask string to use for the given instance.
+      file_path (str): The path to the file containing the PIPELINE_STAGE_MASK line.
     """
     with open(file_path, 'r') as f:
-        lines = f.readlines()
+        content = f.read()
 
-    # Locate the get_pipeline_mask function block.
-    func_start = None
-    func_end = None
-    for i, line in enumerate(lines):
-        if "function automatic" in line and "get_pipeline_mask" in line:
-            func_start = i
-            break
-    if func_start is None:
-        raise Exception("get_pipeline_mask function not found.")
+    # Find the line that defines PIPELINE_STAGE_MASK.
+    # We capture the part before the equals sign, the mask content, and the semicolon.
+    pattern = r"(localparam\s+PIPELINE_STAGE_MASK\s*=\s*)(.*?)(\s*;)"
+    match = re.search(pattern, content, re.DOTALL)
+    if not match:
+        print("PIPELINE_STAGE_MASK not found in file.")
+        return
 
-    for i in range(func_start, len(lines)):
-        if "endfunction" in lines[i]:
-            func_end = i
-            break
-    if func_end is None:
-        raise Exception("endfunction not found for get_pipeline_mask.")
+    prefix = match.group(1)          # e.g. "localparam PIPELINE_STAGE_MASK = "
+    original_mask = match.group(2).strip()  # the current mask contents
+    suffix = match.group(3)          # the semicolon and trailing spaces
 
-    # Locate the case statement and the default line within the function block.
-    case_start = None
-    default_index = None
-    for i in range(func_start, func_end):
-        if "case" in lines[i] and "instance_id" in lines[i]:
-            case_start = i
-        if "default:" in lines[i]:
-            default_index = i
-            break
-    if case_start is None:
-        raise Exception("case (instance_id) not found in the function block.")
-    if default_index is None:
-        raise Exception("default: case not found in the function block.")
+    # Build a regex pattern for an existing branch for the given instance_id.
+    branch_pattern = rf"\(INSTANCE_ID\s*==\s*{instance_id}\)\s*\?\s*([^:]+?)\s*:"
 
-    # Search for an existing instance case between the case statement and default.
-    instance_index = None
-    for i in range(case_start, default_index):
-        stripped = lines[i].strip()
-        # Check if line starts with the instance id followed by a colon.
-        if stripped.startswith(f"{instance_id}:"):
-            instance_index = i
-            break
-
-    # Prepare the new case line using the indent of the default line.
-    default_line = lines[default_index]
-    indent = default_line[:len(default_line) - len(default_line.lstrip())]
-    new_case_line = f"{indent}{instance_id}: get_pipeline_mask = {new_mask}; // THIS LINE WAS ADDED BY THE SCRIPT\n"
-
-    if instance_index is not None:
-        # Overwrite the existing line.
-        lines[instance_index] = new_case_line
+    if re.search(branch_pattern, original_mask):
+        # Replace the existing branch's mask with the custom mask.
+        new_branch = f"(INSTANCE_ID == {instance_id}) ? {custom_mask} :"
+        new_mask = re.sub(branch_pattern, new_branch, original_mask, count=1)
     else:
-        # Insert the new case line just before the default case.
-        lines.insert(default_index, new_case_line)
+        # Insert a new branch right after the equals sign.
+        # Prepend the new branch before the current mask.
+        new_branch = f"(INSTANCE_ID == {instance_id}) ? {custom_mask} : "
+        new_mask = new_branch + original_mask
+
+    # Reconstruct the full localparam line.
+    new_line = prefix + new_mask + suffix
+
+    # Replace the old definition in the file content.
+    new_content = re.sub(pattern, new_line, content, count=1, flags=re.DOTALL)
 
     with open(file_path, 'w') as f:
-        f.writelines(lines)
+        f.write(new_content)
 
 
 def find_pipeline_stage(instance_name, module, top_module):
@@ -205,10 +198,10 @@ def get_register_metrics(condition):
         # Add or Update pipeline mask in module file. Current code just duplicates what it founds in the module file and writes it explicity to the case.
         if data["startpoint"].module != "INPUT":
             print(f"Updating {data['startpoint'].instance_id} with {data['startpoint'].pipeline_mask}")
-            update_pipeline_mask(data["startpoint"].instance_id, data["startpoint"].pipeline_mask, module_file_location)
+            modify_pipeline_mask(data["startpoint"].instance_id, data["startpoint"].pipeline_mask, module_file_location)
         if data["endpoint"].module != "OUTPUT":
             print(f"Updating {data['endpoint'].instance_id} with {data['endpoint'].pipeline_mask}")
-            update_pipeline_mask(data["endpoint"].instance_id, data["endpoint"].pipeline_mask, module_file_location)
+            modify_pipeline_mask(data["endpoint"].instance_id, data["endpoint"].pipeline_mask, module_file_location)
         print()
 
 
