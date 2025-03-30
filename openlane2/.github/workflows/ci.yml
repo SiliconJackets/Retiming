@@ -1,0 +1,509 @@
+name: CI
+
+# Variables
+env:
+  IP_ROOT: ./test/designs/.ip-root
+# Events that trigger workflow
+on:
+  # Runs on all pushes to branches
+  push:
+  # Runs on all PRs
+  pull_request:
+  # Runs every day at midnight UTC
+  schedule:
+    - cron: "0 0 * * *"
+  # Manual Dispatch
+  workflow_dispatch:
+
+jobs:
+  prepare-test-matrices:
+    name: Prepare Test Matrices and Cache PDKs
+    runs-on: ubuntu-22.04
+    outputs:
+      design_matrix: ${{ steps.set-matrix.outputs.design_matrix }}
+      opdks_rev: ${{ steps.set-rev.outputs.opdks_rev }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Python Dependencies
+        run: |
+          pip3 install poetry poetry-plugin-export
+          poetry export --with dev --without-hashes --format=requirements.txt --output=requirements_tmp.txt
+          pip3 install -r requirements_tmp.txt
+      - name: Determine If Running Extended Test Set
+        run: |
+          export EVENT_NAME=${{ github.event_name }};
+          python3 ./.github/scripts/determine_test_set.py
+      - name: Set Matrix
+        id: set-matrix
+        run: |
+          python3 ./.github/test_sets/get_test_matrix.py --scl sky130A/sky130_fd_sc_hd --scl gf180mcuD/gf180mcu_fd_sc_mcu7t5v0 $TEST_SETS
+          echo "design_matrix=$(python3 ./.github/test_sets/get_test_matrix.py --scl sky130A/sky130_fd_sc_hd --scl gf180mcuD/gf180mcu_fd_sc_mcu7t5v0 $TEST_SETS)" >> $GITHUB_OUTPUT
+      - name: Get Open PDKs Revision
+        id: set-rev
+        run: |
+          echo "opdks_rev=$(cat ./openlane/open_pdks_rev)" >> $GITHUB_OUTPUT
+      - name: Cache sky130 PDK
+        uses: actions/cache@v4
+        with:
+          path: ./.volare-sky130
+          key: cache-sky130-pdk-${{ steps.set-rev.outputs.opdks_rev }}
+          enableCrossOsArchive: true
+      - name: Enable sky130 PDK
+        run: |
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          volare enable --pdk sky130 --pdk-root ./.volare-sky130 ${{ steps.set-rev.outputs.opdks_rev }}
+      - name: Cache gf180mcu PDK
+        uses: actions/cache@v4
+        with:
+          path: ./.volare-gf180mcu
+          key: cache-gf180mcu-pdk-${{ steps.set-rev.outputs.opdks_rev }}
+          enableCrossOsArchive: true
+      - name: Enable gf180mcu PDK
+        run: |
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          volare enable --pdk gf180mcu --pdk-root ./.volare-gf180mcu ${{ steps.set-rev.outputs.opdks_rev }}
+      - name: Download IPM
+        run: |
+          python3 -m pip install git+https://github.com/efabless/IPM
+      - name: Checkout submodules
+        uses: actions/checkout@v3
+        with:
+          submodules: true
+  lint:
+    name: Lint
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      - name: Install Linters
+        run: make venv
+      - name: Lint
+        run: |
+          PATH=$PWD/venv/bin:$PATH make lint
+  build-py:
+    runs-on: ubuntu-22.04
+    needs: [lint, prepare-test-matrices]
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+      fail-fast: false
+    name: Build and Unit Test (Python ${{ matrix.python-version }})
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run Unit Tests
+        run: |
+          make venv
+
+          ./venv/bin/coverage run -m pytest -n auto --pdk-root="./.volare-sky130"
+          ./venv/bin/coverage report
+          ./venv/bin/coverage html
+  build-linux-amd64:
+    needs: lint
+    runs-on: ubuntu-22.04
+    name: Build (Nix/x86_64-linux)
+    steps:
+      - uses: actions/checkout@v3
+      - name: Initialize Step Unit Test Submodule
+        run: |
+          git submodule update --init test/steps/all
+      - name: Set up GITHUB_TOKEN
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build with Nix
+        uses: ./.github/actions/build_nix
+        with:
+          nix_system: x86_64-linux
+          cachix_cache: ${{ vars.CACHIX_CACHE || 'openlane' }}
+          cachix_token: "${{ secrets.CACHIX_TOKEN }}"
+          run_tests: "true"
+  build-linux-aarch64:
+    needs: lint
+    runs-on: ubuntu-22.04
+    name: Build (Nix/aarch64-linux)
+    steps:
+      - uses: docker/setup-qemu-action@v1
+      - uses: actions/checkout@v3
+      - name: Initialize Step Unit Test Submodule
+        run: |
+          git submodule update --init test/steps/all
+      - name: Set up GITHUB_TOKEN
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build with Nix
+        uses: ./.github/actions/build_nix
+        with:
+          nix_system: aarch64-linux
+          cachix_cache: ${{ vars.CACHIX_CACHE || 'openlane' }}
+          cachix_token: "${{ secrets.CACHIX_TOKEN }}"
+          run_tests: "true"
+  build-darwin:
+    strategy:
+      matrix:
+        system:
+          [
+            { gha: macos-13, nix: "x86_64-darwin" },
+            { gha: macos-14, nix: "aarch64-darwin" },
+          ]
+      fail-fast: false
+    needs: [lint, prepare-test-matrices]
+    runs-on: ${{ matrix.system.gha }}
+    name: Build (Nix/${{ matrix.system.nix }})
+    steps:
+      - uses: actions/checkout@v3
+      - name: Initialize Step Unit Test Submodule
+        run: |
+          git submodule update --init test/steps/all
+      - name: Set up GITHUB_TOKEN
+        run: |
+          echo "GITHUB_TOKEN=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      # For some reason, GHA Macs are far more aggressively rate-limited with
+      # Volare than Linux
+      - name: Cache sky130 PDK
+        uses: actions/cache@v4
+        with:
+          path: ./.volare-sky130
+          key: cache-sky130-pdk-${{ steps.set-rev.outputs.opdks_rev }}
+          enableCrossOsArchive: true
+      - name: Build with Nix
+        uses: ./.github/actions/build_nix
+        with:
+          nix_system: ${{ matrix.system.nix }}
+          cachix_cache: ${{ vars.CACHIX_CACHE || 'openlane' }}
+          cachix_token: "${{ secrets.CACHIX_TOKEN }}"
+          shell: "zsh {0}"
+          run_tests: "true"
+          pdk_root: ${{ github.workspace }}/.volare-sky130
+  build-docker:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        arch: ["amd64", "aarch64"]
+    needs: [build-linux-amd64, build-linux-aarch64]
+    name: Build Docker Image (${{ matrix.arch }})
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+          remove-docker-images: "true"
+          root-reserve-mb: 20480
+      - name: Check out repo
+        uses: actions/checkout@v3
+
+      - uses: docker/setup-qemu-action@v1
+      - name: Set Nix System
+        run: |
+          nix_system=x86_64-linux
+          if [ "${{ matrix.arch }}" == "aarch64" ]; then
+            nix_system=aarch64-linux
+          fi
+          echo "NIX_SYSTEM=$nix_system" >> $GITHUB_ENV
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build with Nix
+        uses: ./.github/actions/build_nix
+        with:
+          nix_system: ${{ env.NIX_SYSTEM }}
+          cachix_cache: ${{ vars.CACHIX_CACHE || 'openlane' }}
+
+      - name: Build Docker Image
+        run: |
+          IMAGE_PATH=$(nix build\
+            --print-out-paths\
+            --no-link\
+            --accept-flake-config\
+            --option system ${{ env.NIX_SYSTEM }}\
+            --extra-platforms ${{ env.NIX_SYSTEM }}\
+            .#packages.${{ env.NIX_SYSTEM }}.openlane-docker)
+          echo "IMAGE_PATH=$IMAGE_PATH" >> $GITHUB_ENV
+          cat $IMAGE_PATH | docker load
+      - name: Set Up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      - name: Install Dependencies
+        run: make venv
+      # Do not cache the PDK. We want to test the typical Docker flow here.
+      - name: Smoke-Test Docker Image
+        run: |
+          mkdir -p $HOME/.volare
+          chmod -R 755 $HOME/.volare
+          if [ "${{ matrix.arch }}" == "aarch64" ]; then
+            export OPENLANE_IMAGE_OVERRIDE=openlane:tmp-aarch64-linux
+          elif [ "${{ matrix.arch }}" == "amd64" ]; then
+            export OPENLANE_IMAGE_OVERRIDE=openlane:tmp-x86_64-linux
+          fi
+          ./venv/bin/python3 -m openlane\
+            --docker-no-tty\
+            --dockerized\
+            --pdk-root ./.volare-sky130\
+            --smoke-test
+      - name: Upload Docker Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ matrix.arch }}
+          path: ${{ env.IMAGE_PATH }}
+  test:
+    runs-on: ubuntu-22.04
+    needs: [build-linux-amd64, prepare-test-matrices]
+    name: Test Design ${{ matrix.design.test_name }} (${{ matrix.design.pdk }}/${{matrix.design.scl}})
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare-test-matrices.outputs.design_matrix) }}
+    steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          remove-dotnet: "true"
+          remove-android: "true"
+          remove-haskell: "true"
+          remove-codeql: "true"
+          remove-docker-images: "true"
+          root-reserve-mb: 20480
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Check if Git
+        run: |
+          git status || true
+          tree .git || true
+      - uses: DeterminateSystems/nix-installer-action@main
+        with:
+          extra-conf: |
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/magic-nix-cache-action@main
+      - name: Build with Nix
+        uses: ./.github/actions/build_nix
+        with:
+          nix_system: x86_64-linux
+          cachix_cache: ${{ vars.CACHIX_CACHE || 'openlane' }}
+
+      - name: Check Nix
+        run: |
+          sudo du -hs /nix/store/* | sort -h | tail -n 10
+          sudo tree /nix/store/*-openlane2 || true
+      - name: Cache PDK
+        id: cache-pdk
+        uses: actions/cache@v4
+        with:
+          path: ./.volare-${{ matrix.design.pdk_family }}
+          key: cache-${{ matrix.design.pdk_family }}-pdk-${{ needs.prepare-test-matrices.outputs.opdks_rev }}
+          enableCrossOsArchive: true
+      - name: Enable PDKs
+        if: steps.cache-pdk.outputs.cache-hit != 'true'
+        run: |
+          pip3 install poetry poetry-plugin-export
+          poetry export --with dev --without-hashes --format=requirements.txt --output=requirements_tmp.txt
+          pip3 install -r requirements_tmp.txt
+          volare enable --pdk ${{ matrix.design.pdk_family }} \
+            --pdk-root ./.volare-${{ matrix.design.pdk_family }} \
+            ${{ needs.prepare-test-matrices.outputs.opdks_rev }}
+
+      - name: Download IPM designs
+        id: download-ipm-design
+        if: matrix.design.ipm_version != 'None'
+        run: |
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          python3 -m pip install git+https://github.com/efabless/IPM
+          ipm install --ip-root $(realpath $IP_ROOT) --ipm-root ~/.ipm --version ${{ matrix.design.ipm_version }} ${{ matrix.design.name }}
+
+      - name: Run Test
+        run: |
+          if test ${{matrix.design.script}} = "None"
+          then
+            mkdir -p ${{ github.workspace }}/run
+            sudo du -hs /nix/store/* | sort -h | tail -n 10
+            sudo du -hs /nix/store/* | sort -h | tail -n 10 > before.txt
+            nix run --accept-flake-config .#openlane --\
+              --run-tag ${{ matrix.design.pdk }}-${{ matrix.design.scl }}\
+              --pdk ${{ matrix.design.pdk }}\
+              --scl ${{ matrix.design.scl }}\
+              --pdk-root ./.volare-${{ matrix.design.pdk_family }}\
+              --condensed\
+              ${{ matrix.design.config }}
+          else
+            nix develop --accept-flake-config --command\
+              python3 ${{ matrix.design.script }}\
+              --run-tag ${{ matrix.design.pdk }}-${{ matrix.design.scl }}\
+              --pdk ${{ matrix.design.pdk }}\
+              --scl ${{ matrix.design.scl }}\
+              --pdk-root ./.volare-${{ matrix.design.pdk_family }}\
+              --condensed
+          fi
+      - name: Upload Run Folder
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.design.test_name }}-${{ matrix.design.pdk }}-${{ matrix.design.scl }}
+          path: ${{ matrix.design.run_dir }}
+
+      - name: Fetch Metrics
+        if: ${{ always() }}
+        run: |
+          nix develop --accept-flake-config --command openlane.state latest\
+              ${{ matrix.design.run_dir }}\
+              --extract-metrics-to ${{ matrix.design.pdk }}-${{ matrix.design.scl }}-${{ matrix.design.test_name }}.metrics.json
+      - name: Upload Metrics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.design.pdk }}-${{ matrix.design.scl }}-${{ matrix.design.test_name }}.metrics.json
+          path: ${{ matrix.design.pdk }}-${{ matrix.design.scl }}-${{ matrix.design.test_name }}.metrics.json
+  merge_metrics:
+    name: Merge Metrics
+    runs-on: ubuntu-22.04
+    needs: test
+    if: ${{ always() }}
+    steps:
+      - name: Merge Artifacts
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: metrics
+          pattern: "*.metrics.json"
+  upload_metrics:
+    name: Upload Metrics
+    runs-on: ubuntu-22.04
+    needs: [test, merge_metrics]
+    if: ${{ always() }}
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup
+        run: |
+          sudo apt-get install -y python3-tk
+          python3 -m pip install -e .
+          echo "BRANCH_NAME=${GITHUB_REF##*/}" >> $GITHUB_ENV
+      - name: Download Metrics
+        uses: actions/download-artifact@v4
+        with:
+          name: metrics
+          path: current
+      - name: "[PRs] Compare to target branch and comment result (if the workflow has secrets access)"
+        uses: actions/github-script@v6
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          github-token: ${{ secrets.GH_TOKEN }}
+          script: |
+            require("./.github/scripts/compare_metrics.js")({
+              github: github,
+              context: context,
+              botUsername: "openlane-bot",
+              botToken: "${{ secrets.GH_TOKEN }}",
+              comparingDirectory: "current",
+              againstBranch: "${{ github.base_ref }}",
+            }).then(()=>{console.log("Done.");});
+      - name: "[Push] Upload Metrics"
+        if: ${{ github.event_name == 'push' }} # && env.BRANCH_NAME == 'main' }}
+        run: |
+          CURRENT_SHA=$(git rev-parse HEAD)
+          REPO=efabless/openlane-metrics
+          BRANCH_NAME="commit-$CURRENT_SHA"
+          echo "Uploading to 'github.com/$REPO@$BRANCH_NAME'…"
+          cd current
+          git init -b $BRANCH_NAME
+          git add .
+          git config user.name "${{ vars.BOT_NAME }}"
+          git config user.email "${{ vars.BOT_EMAIL }}"
+          git commit -m "Upload"
+          git remote add origin "https://${{ vars.BOT_USERNAME }}:${{ secrets.GH_TOKEN }}@github.com/$REPO.git"
+          git push -fu origin $BRANCH_NAME # Force for if we have to re-run the CI for some reason
+  publish:
+    runs-on: ubuntu-22.04
+    needs: [build-linux-amd64, build-docker, build-py]
+    name: Publish (If Applicable)
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Setup Environment
+        uses: ./.github/actions/setup_env
+      - name: Auth (Docker)
+        if: ${{ env.PUBLISH == '1' }}
+        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+      - name: Download Image (Docker/amd64)
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-amd64
+          path: /tmp/docker
+      - name: Download Image (Docker/aarch64)
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image-aarch64
+          path: /tmp/docker
+      - name: Load Images (Docker)
+        run: |
+          for file in /tmp/docker/*; do
+            cat $file | docker load
+          done
+      - name: Push (Docker)
+        if: ${{ env.PUBLISH == '1' }}
+        run: |
+          docker tag openlane:tmp-x86_64-linux ghcr.io/${{ github.repository }}:$NEW_TAG-amd64
+          docker push ghcr.io/${{ github.repository }}:$NEW_TAG-amd64
+
+          docker tag openlane:tmp-aarch64-linux ghcr.io/${{ github.repository }}:$NEW_TAG-aarch64
+          docker push ghcr.io/${{ github.repository }}:$NEW_TAG-aarch64
+
+          docker manifest create\
+            ghcr.io/${{ github.repository }}:$NEW_TAG\
+            ghcr.io/${{ github.repository }}:$NEW_TAG-amd64\
+            ghcr.io/${{ github.repository }}:$NEW_TAG-aarch64
+
+          docker manifest push ghcr.io/${{ github.repository }}:$NEW_TAG
+      - name: Set Up Python
+        if: ${{ env.PUBLISH == '1' }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.8"
+      - name: Build Distribution
+        if: ${{ env.PUBLISH == '1' }}
+        run: |
+          make dist
+      - name: Publish
+        if: ${{ env.PUBLISH == '1' }}
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Tag Commit
+        if: ${{ env.PUBLISH == '1' }}
+        uses: tvdias/github-tagger@v0.0.1
+        with:
+          tag: "${{ env.NEW_TAG }}"
+          repo-token: "${{ secrets.GH_TOKEN }}"
