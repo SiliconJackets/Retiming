@@ -25,15 +25,15 @@ module adder_tree #(
   input  logic i_valid,
   input  logic [DATAWIDTH-1:0] in_data [0:NUM_INPUTS-1],
   output logic o_valid,
-  output logic [DATAWIDTH+5:0] sum_reg
+  output logic [DATAWIDTH + $clog2(NUM_INPUTS - 1) + 1:0] sum_reg
 );
 
   localparam int NUM_STAGES = $clog2(NUM_INPUTS - 1) + 1;
   localparam STAGE_MASK_WIDTH = NUM_STAGES + 1;
   localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}}; 
 
-  logic [DATAWIDTH+5:0] stage_data [0:NUM_STAGES][0:31];
-  logic [DATAWIDTH+5:0] comb_result [0:NUM_STAGES][0:31];
+  logic [DATAWIDTH+5:0] stage_data [0:NUM_STAGES][0:NUM_INPUTS-1];
+  logic [DATAWIDTH+5:0] comb_result [0:NUM_STAGES][0:(NUM_INPUTS+1)/2];
   
   logic valid_r [0:NUM_STAGES];
 
