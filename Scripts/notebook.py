@@ -126,12 +126,12 @@ def modify_pipeline_mask(instance_id, custom_mask, file_path):
 
     if re.search(branch_pattern, original_mask):
         # Replace the existing branch's mask with the custom mask.
-        new_branch = f"(INSTANCE_ID == {instance_id}) ? {custom_mask} :"
+        new_branch = f"(INSTANCE_ID == {instance_id}) ? {len(custom_mask)}'b{custom_mask} :"
         new_mask = re.sub(branch_pattern, new_branch, original_mask, count=1)
     else:
         # Insert a new branch right after the equals sign.
         # Prepend the new branch before the current mask.
-        new_branch = f"(INSTANCE_ID == {instance_id}) ? {custom_mask} : "
+        new_branch = f"(INSTANCE_ID == {instance_id}) ? {len(custom_mask)}'b{custom_mask} : "
         new_mask = new_branch + original_mask
 
     # Reconstruct the full localparam line.
