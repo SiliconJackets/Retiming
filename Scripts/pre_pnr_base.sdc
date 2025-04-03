@@ -31,20 +31,22 @@ if { [info exists ::env(MAX_CAPACITANCE_CONSTRAINT)] } {
     set_max_capacitance $::env(MAX_CAPACITANCE_CONSTRAINT) [current_design]
 } 
 
-set clk_input [get_port $clock_port]
+set clk_input [get_ports $clock_port]
 set clk_indx [lsearch [all_inputs] $clk_input]
 set all_inputs_wo_clk [lreplace [all_inputs] $clk_indx $clk_indx ""]
 
-set rst_input [get_port rst]
+set rst_input [get_ports rst]
 set rst_indx [lsearch [all_inputs] $rst_input]
 set all_inputs_wo_clk_rst [lreplace $all_inputs_wo_clk $rst_indx $rst_indx ""]
 set all_inputs_wo_clk_rst $all_inputs_wo_clk
 
-# correct resetn
 set clocks [get_clocks $clock_port]
 
 set_input_delay $input_delay_value -clock $clocks $all_inputs_wo_clk_rst
 set_output_delay $output_delay_value -clock $clocks [all_outputs]
+
+## False path the reset
+set_false_path -from [get_ports rst]
 
 ## if { ![info exists ::env(SYNTH_CLK_DRIVING_CELL)] } {
 ##     set ::env(SYNTH_CLK_DRIVING_CELL) $::env(SYNTH_DRIVING_CELL)

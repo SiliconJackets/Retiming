@@ -32,7 +32,7 @@ module div_stage_comb #(
     condition = (new_rem_concat >= B_in);
 
     out_rem = condition ? (new_rem_concat - B_in) : new_rem_concat;
-    out_quo = condition ? { in_quo[WIDTH-2:0], 1'b1 } : { in_quo[WIDTH-2:0], 1'b0 };
+    out_quo = {in_quo[WIDTH-2:0], condition};
 
   end
 endmodule

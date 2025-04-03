@@ -64,6 +64,7 @@ synthesis.start()
 # Static Timing Analysis Pre-PNR (STA Pre-PNR)
 STAPrePNR = Step.factory.get("OpenROAD.STAPrePNR")
 sta_pre_pnr = STAPrePNR(
+    PNR_SDC_FILE="pre_pnr_base.sdc",
     VERILOG_FILES=FILES,
     state_in=synthesis.state_out,  # Use the output state from synthesis as input state for STA Pre-PNR
 )
