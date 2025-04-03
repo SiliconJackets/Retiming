@@ -196,10 +196,10 @@ def get_register_metrics(condition):
         print(f"Module File: {module_file_location}")
         print(f"Data: {data}")
         # Add or Update pipeline mask in module file. Current code just duplicates what it founds in the module file and writes it explicity to the case.
-        if data["startpoint"].module != "INPUT":
+        if data["startpoint"].module != "INPUT" and module_file_location != None:
             print(f"Updating {data['startpoint'].instance_id} with {data['startpoint'].pipeline_mask}")
             modify_pipeline_mask(data["startpoint"].instance_id, data["startpoint"].pipeline_mask, module_file_location)
-        if data["endpoint"].module != "OUTPUT":
+        if data["endpoint"].module != "OUTPUT" and module_file_location != None:
             print(f"Updating {data['endpoint'].instance_id} with {data['endpoint'].pipeline_mask}")
             modify_pipeline_mask(data["endpoint"].instance_id, data["endpoint"].pipeline_mask, module_file_location)
         print()

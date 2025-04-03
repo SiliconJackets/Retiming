@@ -21,7 +21,7 @@ module array_multiplier_top #(
   array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
     .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES),
-    .INSTANCE_ID(INSTANCE_ID)
+    .INSTANCE_ID(0)
   )
   mul0 (
     .A(A),
@@ -33,11 +33,12 @@ module array_multiplier_top #(
     .o_valid(o_valid)
   );
 
+/*
   // Instantiate the 8-bit array multiplier
   array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
     .NUM_PIPELINE_STAGES(3),
-    .INSTANCE_ID(2)
+    .INSTANCE_ID(1)
   )
   mul1 (
     .A(A),
@@ -50,4 +51,5 @@ module array_multiplier_top #(
   ); 
 
   assign Z_final = Z1 + Z2;
+*/
 endmodule
