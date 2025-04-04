@@ -29,6 +29,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 clock_pin = "clk"
 ##Clock period
 clock_period = 1.7
+N = 1  # Number of iterations for the algorithm
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -241,12 +242,14 @@ def find_pipeline_stage(instance_name, module, top_module, iterations):
 
 def the_algorithm(condition, iterations):
     # Get Data
-    metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max_10_critical.rpt") 
+    print("Gather Data")
+    metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt") 
     instance_details = metrics.get_instance_details()
-
+    print(len(instance_details))
     # Process Data
     simplified = {}
     for i, details in enumerate(instance_details):
+        print(i)
         if details["startpoint"].module != "INPUT":
             details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0], iterations)
 
@@ -260,6 +263,8 @@ def the_algorithm(condition, iterations):
             simplified[key]["slack"] = min(simplified[key]["slack"], details["slack"])
             simplified[key]["violated"] = simplified[key]["violated"] or details["violated"]
 
+    for i in (item for item in list(simplified.values())):
+        print(i)
     violated_paths = [item for item in list(simplified.values()) if item["violated"]]
     violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
     
@@ -285,7 +290,7 @@ def the_algorithm(condition, iterations):
     print(changed_modules)
 
 
-for iterations in range(4):
+for iterations in range(N):
     '''
     SYNTHESIS
     '''
