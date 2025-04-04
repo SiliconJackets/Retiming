@@ -6,6 +6,7 @@ from openlane.state import State
 import os
 import json
 import re
+import time
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
@@ -41,6 +42,7 @@ Config.interactive(
 )
 ## No changes bellow this line ###
 
+
 '''
 UTILITY FUNCTIONS
 '''
@@ -62,77 +64,6 @@ def file_finder(string, file_list):
     return None
 
 
-def find_pipeline_stage(instance_name, module, top_module):
-    '''
-    Given an instance name and module, return the pipeline stage and pipeline mask.
-    Args:
-        instance_name: The name of the instance
-        module: The module name
-        top_module: The top module name
-    Returns:
-        num_pipelines: The number of pipeline stages
-        pipeline_mask: The pipeline mask
-        instance_id: The instance id
-        num_enabled_pipeline_stages: The number of enabled pipeline stages
-    '''
-    with open(f"./openlane_run/1-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
-        data = json.load(f)
-    module_key = data["modules"][top_module]["cells"][instance_name]["type"]
-    
-    mask = f"{module}_pipeline_stage"
-    module = data["modules"][module_key]["cells"]
-
-    datawidth = int(data["modules"][module_key]["parameter_default_values"]["DATAWIDTH"], 2)
-    num_pipelines = datawidth + 2
-    instance_id = int(data["modules"][module_key]["parameter_default_values"]["INSTANCE_ID"], 2)
-    num_enabled_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
-
-    pipeline_details = {key : value for key, value in module.items() if mask in key}
-    pipeline_mask = ""
-    for key in pipeline_details.keys():
-        if "ENABLE" in pipeline_details[key]["type"]:
-            pipeline_mask = pipeline_details[key]["type"][-1]+pipeline_mask
-
-    return num_pipelines, pipeline_mask, instance_id, num_enabled_pipeline_stages
-
-
-def shift_pipeline_bit(pipeline_mask, pipeline_stage, left):
-    """
-    Helper function to move the '1' bit from 'from_stage' to 'to_stage' in
-    a pipeline mask string. Assumes leftmost bit = highest stage, rightmost bit = stage 0.
-    Args:
-        pipeline_mask: The pipeline mask string (e.g., "100110")
-        pipeline_stage: The stage to move the '1' bit from (0-indexed)
-        left: Boolean indicating the direction to move the bit.
-            If True, move left (to a higher stage); if False, move right (to a lower stage).
-    Returns:
-        Updated pipeline mask string with the '1' bit moved
-        and a boolean indicating if the operation was successful.
-    """
-    if pipeline_stage is None:
-        return pipeline_mask, False
-
-    bits = list(pipeline_mask)
-    curr_idx = len(bits) - 1 - pipeline_stage
-
-    if left:
-        new_stage = pipeline_stage + 1
-    else:
-        new_stage = pipeline_stage - 1
-        
-    new_idx = len(bits) - 1 - new_stage
-
-    # If either index is out of range, do nothing
-    if not (0 <= curr_idx < len(bits)) or not (0 <= new_idx < len(bits)):
-        return pipeline_mask, False
-    # Move the '1' bit only if current bit is '1' and target bit is '0'
-    if bits[curr_idx] == '1' and bits[new_idx] == '0':
-        bits[curr_idx] = '0'
-        bits[new_idx] = '1'
-        return "".join(bits), True
-    return pipeline_mask, False
-
-
 def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails):
     """
     Generate pipeline mask based on the timing path between startpoint and endpoint.
@@ -144,6 +75,42 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
     Returns:
         Updated pipeline masks for both startpoint and endpoint instances
     """
+    def shift_pipeline_bit(pipeline_mask, pipeline_stage, left):
+        """
+        Helper function to move the '1' bit from 'from_stage' to 'to_stage' in
+        a pipeline mask string. Assumes leftmost bit = highest stage, rightmost bit = stage 0.
+        Args:
+            pipeline_mask: The pipeline mask string (e.g., "100110")
+            pipeline_stage: The stage to move the '1' bit from (0-indexed)
+            left: Boolean indicating the direction to move the bit.
+                If True, move left (to a higher stage); if False, move right (to a lower stage).
+        Returns:
+            Updated pipeline mask string with the '1' bit moved
+            and a boolean indicating if the operation was successful.
+        """
+        if pipeline_stage is None:
+            return pipeline_mask, False
+
+        bits = list(pipeline_mask)
+        curr_idx = len(bits) - 1 - pipeline_stage
+
+        if left:
+            new_stage = pipeline_stage + 1
+        else:
+            new_stage = pipeline_stage - 1
+            
+        new_idx = len(bits) - 1 - new_stage
+
+        # If either index is out of range, do nothing
+        if not (0 <= curr_idx < len(bits)) or not (0 <= new_idx < len(bits)):
+            return pipeline_mask, False
+        # Move the '1' bit only if current bit is '1' and target bit is '0'
+        if bits[curr_idx] == '1' and bits[new_idx] == '0':
+            bits[curr_idx] = '0'
+            bits[new_idx] = '1'
+            return "".join(bits), True
+        return pipeline_mask, False
+    
     #  INPUT to REGISTER
     if startpoint.module == "INPUT":
         pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
@@ -173,7 +140,7 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
         else:
             print("Warning: Unable to shift pipeline bit.")
             return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
-
+        
 
 def modify_pipeline_mask(instance_id, custom_mask, file_path):
     """
@@ -184,21 +151,21 @@ def modify_pipeline_mask(instance_id, custom_mask, file_path):
     right after the equals sign.
     
     Example:
-      For instance_id=1 and custom_mask="{ {STAGE_MASK_WIDTH-2{1'b0}}, 2'b11 }", 
-      the line:
-      
+    For instance_id=1 and custom_mask="{ {STAGE_MASK_WIDTH-2{1'b0}}, 2'b11 }", 
+    the line:
+    
         localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},
                                             {NUM_PIPELINE_STAGES{1'b1}} };
-      
-      will be transformed to:
-      
+    
+    will be transformed to:
+    
         localparam PIPELINE_STAGE_MASK = (INSTANCE_ID == 1) ? { {STAGE_MASK_WIDTH-2{1'b0}}, 2'b11 } : { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},
                                             {NUM_PIPELINE_STAGES{1'b1}} };
     
     Parameters:
-      instance_id (int or str): The instance id to update/insert.
-      custom_mask (str): The custom mask string to use for the given instance.
-      file_path (str): The path to the file containing the PIPELINE_STAGE_MASK line.
+    instance_id (int or str): The instance id to update/insert.
+    custom_mask (str): The custom mask string to use for the given instance.
+    file_path (str): The path to the file containing the PIPELINE_STAGE_MASK line.
     """
     with open(file_path, 'r') as f:
         content = f.read()
@@ -238,19 +205,53 @@ def modify_pipeline_mask(instance_id, custom_mask, file_path):
         f.write(new_content)
 
 
-def the_algorithm(condition):
+def find_pipeline_stage(instance_name, module, top_module, iterations):
+    '''
+    Given an instance name and module, return the pipeline stage and pipeline mask.
+    Args:
+        instance_name: The name of the instance
+        module: The module name
+        top_module: The top module name
+    Returns:
+        num_pipelines: The number of pipeline stages
+        pipeline_mask: The pipeline mask
+        instance_id: The instance id
+        num_enabled_pipeline_stages: The number of enabled pipeline stages
+    '''
+    with open(f"./openlane_run/{2*iterations+1}-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
+        data = json.load(f)
+    module_key = data["modules"][top_module]["cells"][instance_name]["type"]
+    
+    mask = f"{module}_pipeline_stage"
+    module = data["modules"][module_key]["cells"]
+
+    datawidth = int(data["modules"][module_key]["parameter_default_values"]["DATAWIDTH"], 2)
+    num_pipelines = datawidth + 2
+    instance_id = int(data["modules"][module_key]["parameter_default_values"]["INSTANCE_ID"], 2)
+    num_enabled_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
+
+    pipeline_details = {key : value for key, value in module.items() if mask in key}
+    pipeline_mask = ""
+    for key in pipeline_details.keys():
+        if "ENABLE" in pipeline_details[key]["type"]:
+            pipeline_mask = pipeline_details[key]["type"][-1]+pipeline_mask
+
+    return num_pipelines, pipeline_mask, instance_id, num_enabled_pipeline_stages
+
+
+def the_algorithm(condition, iterations):
     # Get Data
-    metrics = TimingRptParser(f"./openlane_run/2-openroad-staprepnr/{condition}/max_10_critical.rpt") 
+    metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max_10_critical.rpt") 
     instance_details = metrics.get_instance_details()
 
     # Process Data
     simplified = {}
     for i, details in enumerate(instance_details):
         if details["startpoint"].module != "INPUT":
-            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
+            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0], iterations)
 
         if details["endpoint"].module != "OUTPUT":
-            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0])
+            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0], iterations)
         
         key = (details["startpoint"].module, details["endpoint"].module)
         if key not in simplified:
@@ -283,46 +284,49 @@ def the_algorithm(condition):
                 changed_modules[data["endpoint"].instance_id] = data["endpoint"].pipeline_mask
     print(changed_modules)
 
-'''
-SYNTHESIS
-'''
-print_available_steps()
 
-Synthesis = Step.factory.get("Yosys.Synthesis")
-synthesis = Synthesis(
-    VERILOG_FILES=FILES,
-    state_in=State(),
-)
-synthesis.start()
+for iterations in range(4):
+    '''
+    SYNTHESIS
+    '''
+    print_available_steps()
 
-# Static Timing Analysis Pre-PNR (STA Pre-PNR)
-STAPrePNR = Step.factory.get("OpenROAD.STAPrePNR")
-sta_pre_pnr = STAPrePNR(
-    PNR_SDC_FILE="pre_pnr_base.sdc",
-    VERILOG_FILES=FILES,
-    state_in=synthesis.state_out,  # Use the output state from synthesis as input state for STA Pre-PNR
-)
-sta_pre_pnr.start()
+    Synthesis = Step.factory.get("Yosys.Synthesis")
+    synthesis = Synthesis(
+        VERILOG_FILES=FILES,
+        state_in=State(),
+    )
+    synthesis.start()
 
-# Parse Timing Data.
-stateout = StateOutMetrics("./openlane_run/2-openroad-staprepnr/state_out.json")
-if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
-    print("Timing Violated For nom_ss_100C_1v60")
-    the_algorithm("nom_ss_100C_1v60")
-else:
-    print("Timing Passed For nom_ss_100C_1v60")
+    # Static Timing Analysis Pre-PNR (STA Pre-PNR)
+    STAPrePNR = Step.factory.get("OpenROAD.STAPrePNR")
+    sta_pre_pnr = STAPrePNR(
+        PNR_SDC_FILE="pre_pnr_base.sdc",
+        VERILOG_FILES=FILES,
+        state_in=synthesis.state_out,  # Use the output state from synthesis as input state for STA Pre-PNR
+    )
+    sta_pre_pnr.start()
 
-'''
-# Disabled for now
-if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
-    print("Timing Violated For nom_tt_025C_1v80")
-    the_algorithm("nom_tt_025C_1v80")
-else:
-    print("Timing Passed For nom_tt_025C_1v80")
+    # Parse Timing Data.
+    stateout = StateOutMetrics(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/state_out.json")
+    if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
+        print("Timing Violated For nom_ss_100C_1v60")
+        the_algorithm("nom_ss_100C_1v60",  iterations)
+    else:
+        print("Timing Passed For nom_ss_100C_1v60")
+        break
+    time.sleep(3)
+    '''
+    # Disabled for now
+    if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
+        print("Timing Violated For nom_tt_025C_1v80")
+        the_algorithm("nom_tt_025C_1v80",  iterations)
+    else:
+        print("Timing Passed For nom_tt_025C_1v80")
 
-if stateout.nom_ff_n40C_1v95.metrics["timing__hold__ws"] < 0 or stateout.nom_ff_n40C_1v95.metrics["timing__setup__ws"] < 0:
-    print("Timing Violated For nom_ff_n40C_1v95")
-    the_algorithm("nom_ff_n40C_1v95")
-else:
-    print("Timing Passed For nom_ff_n40C_1v95")
-'''
+    if stateout.nom_ff_n40C_1v95.metrics["timing__hold__ws"] < 0 or stateout.nom_ff_n40C_1v95.metrics["timing__setup__ws"] < 0:
+        print("Timing Violated For nom_ff_n40C_1v95")
+        the_algorithm("nom_ff_n40C_1v95",  iterations)
+    else:
+        print("Timing Passed For nom_ff_n40C_1v95")
+    '''
