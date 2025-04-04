@@ -2,11 +2,13 @@ import openlane
 from openlane.config import Config
 from openlane.steps import Step
 from openlane.state import State
+
 import os
 import json
 import re
-from metrics import InstanceDetails
-from metrics import TimingRptParser, StateOutMetrics
+
+from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
+
 from dotenv import load_dotenv
 load_dotenv(".env")
 

@@ -1,77 +1,4 @@
-import json
 import re
-
-class StateOutMetrics:
-    def __init__(self, json_file: str):
-        # Load the JSON file
-        with open(json_file, 'r') as f:
-            data = json.load(f)
-        all_metrics = data.get("metrics", {})
-
-        # Global metrics (those without a specific corner)
-        self.global_metrics = {k: v for k, v in all_metrics.items() if "corner:" not in k}
-
-        # Create corner-specific metrics objects
-        self.nom_tt_025C_1v80 = StateOutCornerMetrics("nom_tt_025C_1v80", all_metrics)
-        self.nom_ss_100C_1v60 = StateOutCornerMetrics("nom_ss_100C_1v60", all_metrics)
-        self.nom_ff_n40C_1v95 = StateOutCornerMetrics("nom_ff_n40C_1v95", all_metrics)
-
-    def __repr__(self):
-        return (f"Global Metrics: {self.global_metrics}\n"
-                f"nom_tt_025C_1v80: {self.nom_tt_025C_1v80}\n"
-                f"nom_ss_100C_1v60: {self.nom_ss_100C_1v60}\n"
-                f"nom_ff_n40C_1v95: {self.nom_ff_n40C_1v95}")
-
-
-class StateOutCornerMetrics:
-    def __init__(self, corner: str, metrics: dict):
-        self.corner = corner
-        self.metrics = {}
-        suffix = f"__corner:{corner}"
-        # Iterate over all metrics and select those that match the current corner.
-        for key, value in metrics.items():
-            if suffix in key:
-                # Remove the corner suffix to clean up the metric name.
-                base_key = key.replace(suffix, "")
-                self.metrics[base_key] = value
-
-    def get_metric(self, metric_name: str):
-        """Get a specific metric by its base name."""
-        return self.metrics.get(metric_name)
-
-    def __repr__(self):
-        return str(self.metrics)
-    
-
-class InstanceDetails:
-    def __init__(self, string, startpoint=True):
-        self.module, self.instance_name, self.pipeline_stage = self.pattern_match(string, startpoint)
-        self.pipeline_mask = None
-        self.num_pipeline_stages = None
-        self.instance_id = None
-        self.num_enabled_pipeline_stages = None
-
-    def pattern_match(self, string, startpoint=True):
-        pattern = r'/([^/_]+)_pipeline_stage'
-        match = re.search(pattern, string)
-        if match:
-            module = match.group(1)
-            instance_name = string[:string.find(f"/{module}")]
-            pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
-            match = re.search(pattern, string)
-            pipeline_stage = int(match.group('number'))
-        elif startpoint:
-            module = "INPUT"
-            instance_name = "INPUT"
-            pipeline_stage = None
-        else:
-            module = "OUTPUT"
-            instance_name = "OUTPUT"
-            pipeline_stage = None
-        return module, instance_name, pipeline_stage
-    
-    def __repr__(self):
-        return f"""InstanceDetails(module={self.module}, instance_name={self.instance_name}, instance_id={self.instance_id}, num_pipeline_stages={self.num_pipeline_stages}, pipeline_stage={self.pipeline_stage}, pipeline_mask={self.pipeline_mask}, num_enabled_pipeline_stages={self.num_enabled_pipeline_stages})"""
 
 
 class TimingRptParser:
@@ -139,11 +66,12 @@ class TimingRptParser:
         return self.paths
 
     def get_instance_details(self):
+        from metrics import InstanceDetails  # Import here or at top if you prefer
         instance_details = []
         for path in self.paths:
             startpoint = InstanceDetails(path["startpoint"], startpoint=True)
             endpoint = InstanceDetails(path["endpoint"], startpoint=False)
-            instance_details.append({"startpoint":startpoint, "endpoint":endpoint, "slack":path["slack"], "violated":path["violated"]})
+            instance_details.append({"startpoint": startpoint, "endpoint": endpoint, "slack": path["slack"], "violated": path["violated"]})
         
         return instance_details
 
