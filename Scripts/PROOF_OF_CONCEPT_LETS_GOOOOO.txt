@@ -1,0 +1,7 @@
+clock_period = 1.7
+NUM_PIPELINE_STAGES = 2
+
+Start at default and run script.
+We win.
+
+IT WORKS!!!!

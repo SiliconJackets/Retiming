@@ -5,7 +5,7 @@ from openlane.state import State
 import os
 import json
 import re
-
+from metrics import InstanceDetails
 from metrics import TimingRptParser, StateOutMetrics
 from dotenv import load_dotenv
 load_dotenv(".env")
@@ -26,7 +26,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ##Clock period
-clock_period = 1
+clock_period = 1.7
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -167,14 +167,91 @@ def find_pipeline_stage(instance_name, module, top_module):
     return num_pipelines, pipeline_mask, instance_id, num_enabled_pipeline_stages
 
 
+def shift_pipeline_bit(pipeline_mask, pipeline_stage, left):
+    """
+    Helper function to move the '1' bit from 'from_stage' to 'to_stage' in
+    a pipeline mask string. Assumes leftmost bit = highest stage, rightmost bit = stage 0.
+    Args:
+        pipeline_mask: The pipeline mask string (e.g., "100110")
+        pipeline_stage: The stage to move the '1' bit from (0-indexed)
+        left: Boolean indicating the direction to move the bit.
+            If True, move left (to a higher stage); if False, move right (to a lower stage).
+    Returns:
+        Updated pipeline mask string with the '1' bit moved
+        and a boolean indicating if the operation was successful.
+    """
+    if pipeline_stage is None:
+        return pipeline_mask, False
+
+    bits = list(pipeline_mask)
+    curr_idx = len(bits) - 1 - pipeline_stage
+
+    if left:
+        new_stage = pipeline_stage + 1
+    else:
+        new_stage = pipeline_stage - 1
+        
+    new_idx = len(bits) - 1 - new_stage
+
+    # If either index is out of range, do nothing
+    if not (0 <= curr_idx < len(bits)) or not (0 <= new_idx < len(bits)):
+        return pipeline_mask, False
+    # Move the '1' bit only if current bit is '1' and target bit is '0'
+    if bits[curr_idx] == '1' and bits[new_idx] == '0':
+        bits[curr_idx] = '0'
+        bits[new_idx] = '1'
+        return "".join(bits), True
+    return pipeline_mask, False
+
+
+def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails):
+    """
+    Generate pipeline mask based on the timing path between startpoint and endpoint.
+    
+    Args:
+        startpoint: InstanceDetails object for the startpoint
+        endpoint: InstanceDetails object for the endpoint
+        
+    Returns:
+        Updated pipeline masks for both startpoint and endpoint instances
+    """
+    #  INPUT to REGISTER
+    if startpoint.module == "INPUT":
+        pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+        if success:
+            return None, None, pipeline_mask, endpoint.pipeline_stage - 1
+        else:
+            print("Warning: Unable to shift pipeline bit.")
+            return None, None, endpoint.pipeline_mask, endpoint.pipeline_stage
+    #  REGISTER to OUTPUT
+    elif endpoint.module == "OUTPUT":
+        pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+        if success:
+            return pipeline_mask, startpoint.pipeline_stage + 1, None, None
+        else:
+            print("Warning: Unable to shift pipeline bit.")
+            return startpoint.pipeline_mask, startpoint.pipeline_stage, None, None
+    #  REGISTER to REGISTER
+    #  Known bug: might shift and override previous shifts.
+    pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+    if success:
+        return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+    else:
+        print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
+        pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+        if success:
+            return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+        else:
+            print("Warning: Unable to shift pipeline bit.")
+            return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+
+
 def get_register_metrics(condition):
     metrics = TimingRptParser(f"./openlane_run/2-openroad-staprepnr/{condition}/max_10_critical.rpt") 
     instance_details = metrics.get_instance_details()
 
     print("Instance Details:")
     for i, details in enumerate(instance_details):
-        module_file_location = ""
-
         if details["startpoint"].module != "INPUT":
             details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0])
 
@@ -190,20 +267,32 @@ def get_register_metrics(condition):
         else:
             simplified[key]["slack"] = min(simplified[key]["slack"], item["slack"])
             simplified[key]["violated"] = simplified[key]["violated"] or item["violated"]
-    simplified_data = list(simplified.values())
 
-    for data in simplified_data:
-        module_file_location = file_finder(data["startpoint"].module, design_paths + lib_paths)
-        print(f"Module File: {module_file_location}")
-        print(f"Data: {data}")
-        # Add or Update pipeline mask in module file. Current code just duplicates what it founds in the module file and writes it explicity to the case.
-        if data["startpoint"].module != "INPUT" and module_file_location != None:
-            print(f"Updating {data['startpoint'].instance_id} with {data['startpoint'].pipeline_mask}")
-            modify_pipeline_mask(data["startpoint"].instance_id, data["startpoint"].pipeline_mask, module_file_location)
-        if data["endpoint"].module != "OUTPUT" and module_file_location != None:
-            print(f"Updating {data['endpoint'].instance_id} with {data['endpoint'].pipeline_mask}")
-            modify_pipeline_mask(data["endpoint"].instance_id, data["endpoint"].pipeline_mask, module_file_location)
-        print()
+    violated_paths = [item for item in list(simplified.values()) if item["violated"]]
+    violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
+
+    changed_modules = set()
+    for data in violated_paths:
+        if data["startpoint"].instance_id in changed_modules or data["endpoint"].instance_id in changed_modules:
+            continue
+        else:
+            module_file_location_startpoint = file_finder(data["startpoint"].module, design_paths + lib_paths)
+            module_file_location_endpoint = file_finder(data["endpoint"].module, design_paths + lib_paths)
+            print(f"Startpoint Module File Location: {module_file_location_startpoint}")
+            print(f"Endpoint Module File Location: {module_file_location_endpoint}")
+            print(f"Data: {data}")
+
+            pm1, ps1, pm2, ps2 = generate_pipeline_mask(data["startpoint"], data["endpoint"])
+            if pm1 != data["startpoint"].pipeline_mask:
+                modify_pipeline_mask(data["startpoint"].instance_id, pm1, module_file_location_startpoint)
+                print(f"Run script again to use new pipeline of {pm1}")
+                if ps1 is not None:
+                    changed_modules.add(data["startpoint"].instance_id)
+            if pm2 != data["endpoint"].pipeline_mask:
+                modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
+                print(f"Run script again to use new pipeline of {pm2}")
+                if ps2 is not None:
+                    changed_modules.add(data["endpoint"].instance_id)
 
 
 # Parse Timing Data.

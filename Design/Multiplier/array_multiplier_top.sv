@@ -2,7 +2,7 @@
  
 module array_multiplier_top #(
   parameter DATAWIDTH = 4,
-  parameter NUM_PIPELINE_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
+  parameter NUM_PIPELINE_STAGES = 2,           // For now, have stages refer to pp sums (seventh row is reg out)
   parameter INSTANCE_ID = 0 
   )
   (
