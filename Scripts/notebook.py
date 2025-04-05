@@ -6,7 +6,7 @@ from openlane.state import State
 import os
 import json
 import re
-import time
+import copy
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
@@ -27,9 +27,10 @@ lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
 ## Clock pin name
 clock_pin = "clk"
-##Clock period
-clock_period = 1.7
-N = 4  # Number of iterations for the algorithm
+## Clock period
+clock_period = 1.5
+## Number of iterations for the algorithm
+N_iterations = 10
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -241,7 +242,7 @@ def find_pipeline_stage(instance_name, module, top_module, iterations):
     return num_pipelines, "".join(pipeline_mask), instance_id, num_enabled_pipeline_stages
 
 
-def the_algorithm(condition, iterations):
+def the_algorithm(condition, telemetry):
     def remove_duplicates_keep_lowest_slack(data):
         best = {}
         for entry in data:
@@ -257,9 +258,9 @@ def the_algorithm(condition, iterations):
         return list(best.values())
 
     # Get Data
-    metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt") 
-    instance_details = metrics.get_instance_details()
-    
+    iterations = telemetry["iterations"]
+    metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt")
+    instance_details = metrics.get_instance_details() 
     simplified = remove_duplicates_keep_lowest_slack(instance_details)
 
     # Process Data
@@ -269,40 +270,52 @@ def the_algorithm(condition, iterations):
 
         if details["endpoint"].module != "OUTPUT":
             details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0], iterations)
-    
+    data_hash = hash(tuple(tuple(sorted(d.items())) for d in simplified))  # Compare hashs to see if we have tried this already. 
+
+    # Setup and Update Telemetry
+    temp_telemetry = copy.deepcopy(telemetry)
+    temp_telemetry["iterations"] += 1   
+
+    if data_hash in temp_telemetry["attempted_pipeline_combinations"]:
+        if temp_telemetry["kill_count"] >= 3:
+            temp_telemetry["kill"] = True
+            return temp_telemetry
+        temp_telemetry["kill_count"] += 1
+
+    temp_telemetry["attempted_pipeline_combinations"].add(data_hash)
+
     violated_paths = [item for item in simplified if item["violated"]]
     violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
 
     #print("ALL REGISTER")
     #for i in (simplified):
     #    print(i)
-    print("VIOLATED REGISTER")
-    for i in violated_paths:
-        print(i)
-    
+
+    print(f"Input Telemetry: {telemetry}")
+    print(f"Output Telemetry: {temp_telemetry}")
+
     # Modify Files
-    changed_modules = {}
+    changed_modules = set()
     for data in violated_paths:
-        if data["startpoint"].instance_id in changed_modules.keys() or data["endpoint"].instance_id in changed_modules.keys():
+        if data["startpoint"].instance_id in changed_modules or data["endpoint"].instance_id in changed_modules:
             continue
         else:
             module_file_location_startpoint = file_finder(data["startpoint"].module, design_paths + lib_paths)
             module_file_location_endpoint = file_finder(data["endpoint"].module, design_paths + lib_paths)
-            print(f"Startpoint Module File Location: {module_file_location_startpoint}")
-            print(f"Endpoint Module File Location: {module_file_location_endpoint}")
-            print(f"Data: {data}")
 
             pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"])
             if pm1 != data["startpoint"].pipeline_mask:
                 modify_pipeline_mask(data["startpoint"].instance_id, pm1, module_file_location_startpoint)
-                changed_modules[data["startpoint"].instance_id] = data["startpoint"].pipeline_mask
+                changed_modules.add(data["startpoint"].instance_id)
             if pm2 != data["endpoint"].pipeline_mask:
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
-                changed_modules[data["endpoint"].instance_id] = data["endpoint"].pipeline_mask
-    print(changed_modules)
+                changed_modules.add(data["endpoint"].instance_id)
     
+    return temp_telemetry
 
-for iterations in range(N):
+
+telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
+for iterations in range(N_iterations):
     '''
     SYNTHESIS
     '''
@@ -325,14 +338,25 @@ for iterations in range(N):
     sta_pre_pnr.start()
 
     # Parse Timing Data.
+    iterations = telemetry["iterations"]
     stateout = StateOutMetrics(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/state_out.json")
     if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
         print("Timing Violated For nom_ss_100C_1v60")
-        the_algorithm("nom_ss_100C_1v60",  iterations)
+        temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
+        if temp_telemetry["kill"]:
+            print("Kill Condition Met")
+            print(temp_telemetry)
+            break
+        telemetry = temp_telemetry
     else:
         print("Timing Passed For nom_ss_100C_1v60")
         break
-    time.sleep(3)
+
+    input("Press Enter to continue...")  # Pause for user input
+
+
+
+
     '''
     # Disabled for now
     if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
