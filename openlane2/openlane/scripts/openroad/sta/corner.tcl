@@ -74,7 +74,7 @@ puts "\n========================================================================
 puts "report_checks -path_delay max (Setup)"
 puts "============================================================================"
 puts "======================= [$corner name] Corner ===================================\n"
-report_checks -sort_by_slack -path_delay max -fields {slew cap input nets fanout} -format full_clock_expanded -group_count 1000 -corner [$corner name]
+report_checks -sort_by_slack -path_delay max -fields {slew cap input nets fanout} -format full_clock_expanded -group_count 1000000 -corner [$corner name]
 puts ""
 puts "%OL_END_REPORT"
 

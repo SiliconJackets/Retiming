@@ -28,9 +28,9 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 1.7
+clock_period = 1.5
 ## Number of iterations for the algorithm
-N_iterations = 6
+N_iterations = 20
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -283,6 +283,7 @@ def the_algorithm(condition, telemetry):
     iterations = telemetry["iterations"]
     metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt")
     instance_details = metrics.get_instance_details() 
+
     simplified = remove_duplicates_keep_lowest_slack(instance_details)
 
     # Process Data
