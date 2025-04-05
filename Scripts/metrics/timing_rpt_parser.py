@@ -1,4 +1,6 @@
 import re
+from concurrent.futures import ThreadPoolExecutor
+from metrics import InstanceDetails
 
 
 class TimingRptParser:
@@ -65,8 +67,7 @@ class TimingRptParser:
         """
         return self.paths
 
-    def get_instance_details(self):
-        from metrics import InstanceDetails  # Import here or at top if you prefer
+    def get_instance_details(self): 
         instance_details = []
         for path in self.paths:
             startpoint = InstanceDetails(path["startpoint"], startpoint=True)

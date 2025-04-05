@@ -30,3 +30,13 @@ class InstanceDetails:
     
     def __repr__(self):
         return f"""InstanceDetails(module={self.module}, instance_name={self.instance_name}, instance_id={self.instance_id}, num_pipeline_stages={self.num_pipeline_stages}, pipeline_stage={self.pipeline_stage}, pipeline_mask={self.pipeline_mask}, num_enabled_pipeline_stages={self.num_enabled_pipeline_stages})"""
+
+    # Added for hashability and equality
+    def __eq__(self, other):
+        if not isinstance(other, InstanceDetails):
+            return False
+        return self.__dict__ == other.__dict__
+
+    def __hash__(self):
+        # Convert to a tuple of key-value pairs sorted for consistent hashing
+        return hash(tuple(sorted(self.__dict__.items())))

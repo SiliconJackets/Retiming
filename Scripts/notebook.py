@@ -29,7 +29,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 clock_pin = "clk"
 ##Clock period
 clock_period = 1.7
-N = 1  # Number of iterations for the algorithm
+N = 4  # Number of iterations for the algorithm
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -232,41 +232,53 @@ def find_pipeline_stage(instance_name, module, top_module, iterations):
     num_enabled_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
 
     pipeline_details = {key : value for key, value in module.items() if mask in key}
-    pipeline_mask = ""
+    pipeline_mask = [0]*num_pipelines
     for key in pipeline_details.keys():
         if "ENABLE" in pipeline_details[key]["type"]:
-            pipeline_mask = pipeline_details[key]["type"][-1]+pipeline_mask
-
-    return num_pipelines, pipeline_mask, instance_id, num_enabled_pipeline_stages
+            idx = num_pipelines - 1 - int(re.findall(r'\[(\d+)\]', key)[0])
+            pipeline_mask[idx] = pipeline_details[key]["type"][-1]
+    
+    return num_pipelines, "".join(pipeline_mask), instance_id, num_enabled_pipeline_stages
 
 
 def the_algorithm(condition, iterations):
+    def remove_duplicates_keep_lowest_slack(data):
+        best = {}
+        for entry in data:
+            sp = entry['startpoint']
+            ep = entry['endpoint']
+            slack = entry['slack']
+            key = (sp, ep)
+
+            current_best = best.get(key)
+            if current_best is None or slack < current_best['slack']:
+                best[key] = entry
+
+        return list(best.values())
+
     # Get Data
-    print("Gather Data")
     metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt") 
     instance_details = metrics.get_instance_details()
-    print(len(instance_details))
+    
+    simplified = remove_duplicates_keep_lowest_slack(instance_details)
+
     # Process Data
-    simplified = {}
-    for i, details in enumerate(instance_details):
-        print(i)
+    for i, details in enumerate(simplified):
         if details["startpoint"].module != "INPUT":
             details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0], iterations)
 
         if details["endpoint"].module != "OUTPUT":
             details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0], iterations)
-        
-        key = (details["startpoint"].module, details["endpoint"].module)
-        if key not in simplified:
-            simplified[key] = details.copy()
-        else:
-            simplified[key]["slack"] = min(simplified[key]["slack"], details["slack"])
-            simplified[key]["violated"] = simplified[key]["violated"] or details["violated"]
-
-    for i in (item for item in list(simplified.values())):
-        print(i)
-    violated_paths = [item for item in list(simplified.values()) if item["violated"]]
+    
+    violated_paths = [item for item in simplified if item["violated"]]
     violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
+
+    #print("ALL REGISTER")
+    #for i in (simplified):
+    #    print(i)
+    print("VIOLATED REGISTER")
+    for i in violated_paths:
+        print(i)
     
     # Modify Files
     changed_modules = {}
@@ -288,7 +300,7 @@ def the_algorithm(condition, iterations):
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
                 changed_modules[data["endpoint"].instance_id] = data["endpoint"].pipeline_mask
     print(changed_modules)
-
+    
 
 for iterations in range(N):
     '''

@@ -23,7 +23,7 @@ module array_multiplier #(
 );
 
   localparam STAGE_MASK_WIDTH = DATAWIDTH + 2;
-  localparam PIPELINE_STAGE_MASK = (INSTANCE_ID == 0) ? 18'b000000111000000010 : { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
+  localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
   logic [DATAWIDTH-1:0] A_reg, B_reg,A_reg_wire, B_reg_wire;
 
   // Figure out a way to reduce this for now keeping this as is 
