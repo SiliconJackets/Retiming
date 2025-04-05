@@ -28,9 +28,9 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 1.5
+clock_period = 1.7
 ## Number of iterations for the algorithm
-N_iterations = 10
+N_iterations = 6
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -66,14 +66,14 @@ def file_finder(string, file_list):
     return None
 
 
-def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails):
+def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails, pipeline_details: list):
     """
     Generate pipeline mask based on the timing path between startpoint and endpoint.
     
     Args:
         startpoint: InstanceDetails object for the startpoint
         endpoint: InstanceDetails object for the endpoint
-        
+        pipeline_details: List of pipeline details contatining all startpoint and endpoints
     Returns:
         Updated pipeline masks for both startpoint and endpoint instances
     """
@@ -130,19 +130,41 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
             print("Warning: Unable to shift pipeline bit.")
             return startpoint.pipeline_mask, startpoint.pipeline_stage, None, None
     #  REGISTER to REGISTER
-    #  Known bug: might shift and override previous shifts.
-    pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
-    if success:
-        return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+    startpoint_as_endpoint = None
+    endpoint_as_startpoint = None
+    for pipeline in pipeline_details:
+        if startpoint == pipeline["endpoint"]:
+            startpoint_as_endpoint = pipeline
+        if endpoint == pipeline["startpoint"]:
+            endpoint_as_startpoint = pipeline
+        if startpoint_as_endpoint != None and endpoint_as_startpoint != None:  
+            break
+
+    if startpoint_as_endpoint["slack"] >= endpoint_as_startpoint["slack"]:
+        pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+        if success:
+            return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+        else:
+            print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
+            pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+            if success:
+                return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+            else:
+                print("Warning: Unable to shift pipeline bit.")
+                return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
     else:
-        print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
         pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
         if success:
             return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
         else:
-            print("Warning: Unable to shift pipeline bit.")
-            return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
-        
+            print("Warning: Unable to shift pipeline bit right. Trying to shift left.")
+            pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+            if success:
+                return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+            else:
+                print("Warning: Unable to shift pipeline bit.")
+                return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+
 
 def modify_pipeline_mask(instance_id, custom_mask, file_path):
     """
@@ -287,9 +309,9 @@ def the_algorithm(condition, telemetry):
     violated_paths = [item for item in simplified if item["violated"]]
     violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
 
-    #print("ALL REGISTER")
-    #for i in (simplified):
-    #    print(i)
+    print("ALL REGISTER")
+    for i in (simplified):
+        print(i)
 
     print(f"Input Telemetry: {telemetry}")
     print(f"Output Telemetry: {temp_telemetry}")
@@ -303,14 +325,15 @@ def the_algorithm(condition, telemetry):
             module_file_location_startpoint = file_finder(data["startpoint"].module, design_paths + lib_paths)
             module_file_location_endpoint = file_finder(data["endpoint"].module, design_paths + lib_paths)
 
-            pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"])
+            pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"], simplified)
+            
             if pm1 != data["startpoint"].pipeline_mask:
                 modify_pipeline_mask(data["startpoint"].instance_id, pm1, module_file_location_startpoint)
                 changed_modules.add(data["startpoint"].instance_id)
             if pm2 != data["endpoint"].pipeline_mask:
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
                 changed_modules.add(data["endpoint"].instance_id)
-    
+            
     return temp_telemetry
 
 
@@ -351,6 +374,7 @@ for iterations in range(N_iterations):
         telemetry = temp_telemetry
     else:
         print("Timing Passed For nom_ss_100C_1v60")
+        print(telemetry)
         break
 
     #input("Press Enter to continue...")  # Pause for user input
