@@ -314,11 +314,12 @@ def the_algorithm(condition, telemetry):
     return temp_telemetry
 
 
+'''
+SYNTHESIS
+'''
 telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
 for iterations in range(N_iterations):
-    '''
-    SYNTHESIS
-    '''
+
     print_available_steps()
 
     Synthesis = Step.factory.get("Yosys.Synthesis")
@@ -352,7 +353,7 @@ for iterations in range(N_iterations):
         print("Timing Passed For nom_ss_100C_1v60")
         break
 
-    input("Press Enter to continue...")  # Pause for user input
+    #input("Press Enter to continue...")  # Pause for user input
 
 
 
