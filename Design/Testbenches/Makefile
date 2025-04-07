@@ -1,6 +1,6 @@
 #You should be in the "sim/" directory
 
-INCLUDE_FILE_NAME=multiplier_tb.include
+INCLUDE_FILE_NAME=top_tb.include
 
 #Defines statement for vcs
 VERILOG_DEFINES:=+SIM=1
