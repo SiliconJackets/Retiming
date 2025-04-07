@@ -329,7 +329,10 @@ def the_algorithm(condition, telemetry):
     # Modify Files
     changed_modules = set()
     for data in violated_paths:
-        print(data)
+        print("Startpoint:", data["startpoint"].instance_id, data["startpoint"].module, data["startpoint"].pipeline_mask, data["startpoint"].pipeline_stage)
+        print("Endpoint:", data["endpoint"].instance_id, data["endpoint"].module, data["endpoint"].pipeline_mask, data["endpoint"].pipeline_stage)
+        print("Slack:", data["slack"])
+        print("Violations:", data["violated"])
         if data["startpoint"].instance_id in changed_modules or data["endpoint"].instance_id in changed_modules:
             print("Already Modified This Iteration")
             print("----------------")
@@ -342,8 +345,8 @@ def the_algorithm(condition, telemetry):
 
             print(f"Startpoint File Location: {module_file_location_startpoint}")  
             print(f"Endpoint File Location: {module_file_location_endpoint}")
-            print(f"Startpoint Pipeline Mask Change: ", data["startpoint"].pipeline_mask, " to ", pm1)
-            print(f"Endpoint Pipeline Mask Change: ", data["endpoint"].pipeline_mask, " to ", pm2)
+            print(f"Startpoint Pipeline Mask Change:", data["startpoint"].pipeline_mask, "to", pm1)
+            print(f"Endpoint Pipeline Mask Change:", data["endpoint"].pipeline_mask, "to", pm2)
             print("----------------")
             
             if pm1 != data["startpoint"].pipeline_mask:
