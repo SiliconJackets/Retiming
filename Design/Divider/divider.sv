@@ -32,7 +32,7 @@ module div_stage_comb #(
     condition = (new_rem_concat >= B_in);
 
     out_rem = condition ? (new_rem_concat - B_in) : new_rem_concat;
-    out_quo = {in_quo[WIDTH-2:0], condition};
+    out_quo = { in_quo[WIDTH-2:0], condition };
 
   end
 endmodule
@@ -58,6 +58,8 @@ module array_divider #(
   // output logic [WIDTH-1:0]         R       // Combinational remainder
 );
 
+  logic [DATAWIDTH-1:0] A_shift;
+  assign A_shift = A << 8;
   localparam STAGE_MASK_WIDTH = DATAWIDTH + 1;
   localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}}; 
 
@@ -112,20 +114,20 @@ module array_divider #(
             ) pipe_stage_inst (
               .clk(clk),
               .rst(rst),
-              .data_in({comb_rem0, comb_quo0, A, B, i_valid}),
+              .data_in({comb_rem0, comb_quo0, A_shift, B, i_valid}),
               .data_out({partial_rem[0], partial_quo[0], D_pipe[0], B_pipe[0], i_valid_r[0]})
             );
         end else if (i == STAGE_MASK_WIDTH - 1) begin
-        pipeline_stage #(
-              .WIDTH(4*DATAWIDTH + 1),
-              .ENABLE(PIPELINE_STAGE_MASK[i])
-            ) pipe_stage_inst (
-              .clk(clk),
-              .rst(rst),
-              .data_in({comb_rem[i-1], comb_quo[i-1], D_pipe[i-1], B_pipe[i-1], i_valid_r[i-1]}),
-              .data_out({R_out, Q_out, D_pipe[i], B_pipe[i], o_valid})
-            );
-      end else begin
+            pipeline_stage #(
+                .WIDTH(4*DATAWIDTH + 1),
+                .ENABLE(PIPELINE_STAGE_MASK[i])
+                ) pipe_stage_inst (
+                .clk(clk),
+                .rst(rst),
+                .data_in({comb_rem[i-1], comb_quo[i-1], D_pipe[i-1], B_pipe[i-1], i_valid_r[i-1]}),
+                .data_out({R_out, Q_out, D_pipe[i], B_pipe[i], o_valid})
+                );
+        end else begin
         pipeline_stage #(
               .WIDTH(4*DATAWIDTH + 1),
               .ENABLE(PIPELINE_STAGE_MASK[i])
