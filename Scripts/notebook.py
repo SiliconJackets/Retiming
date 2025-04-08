@@ -31,27 +31,17 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
 top_module = ["array_multiplier_top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", 
                 f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
-
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 1.5
+clock_period = 1.7
 ## Number of iterations for the algorithm
-N_iterations = 40
+N_iterations = 10
 
 FILES = [path for path in design_paths + lib_paths if path]
-Config.interactive(
-    top_module[0],  # Assume first element of top_module list is the top module
-    PDK="sky130A",
-    PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
-    CLOCK_PORT = clock_pin,
-    CLOCK_NET = clock_pin,
-    CLOCK_PERIOD = clock_period,
-    PRIMARY_GDSII_STREAMOUT_TOOL="klayout",
-)
 ## No changes bellow this line ###
 
 
@@ -414,12 +404,22 @@ telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":Fal
 while not flag_stop:
     backup_files = create_backup_files(design_paths)
     for iterations in range(N_iterations):
-
         print_available_steps()
+
+        Config.interactive(
+            top_module[0],  # Assume first element of top_module list is the top module
+            PDK="sky130A",
+            PDK_ROOT=os.getenv("VOLARE_FOLDER"),  # create .env file with VOLARE_FOLDER=<path to skywater-pdk>
+            CLOCK_PORT = clock_pin,
+            CLOCK_NET = clock_pin,
+            CLOCK_PERIOD = clock_period,
+            PRIMARY_GDSII_STREAMOUT_TOOL="klayout",
+        )
 
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
+            SYNTH_HIERARCHY_MODE="keep",
             state_in=State(),
         )
         synthesis.start()
@@ -450,9 +450,7 @@ while not flag_stop:
             print(telemetry) 
             flag_stop = True
             break
-
-        # input("Press Enter to continue...")  # Pause for user input
-    '''
+    
     if not flag_stop:
         restore_backup_files(backup_files)
         telemetry["attempted_pipeline_combinations"].clear()
@@ -460,20 +458,23 @@ while not flag_stop:
         telemetry["kill"] = False
         clock_period += 0.1
         input("Press Enter To Continue With Increased Clock Period...")
-    '''
+    
+    input("Press Enter to continue...")  # Pause for user input
 
 
-'''
-    # Disabled for now
-    if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
-        print("Timing Violated For nom_tt_025C_1v80")
-        the_algorithm("nom_tt_025C_1v80",  iterations)
-    else:
-        print("Timing Passed For nom_tt_025C_1v80")
 
-    if stateout.nom_ff_n40C_1v95.metrics["timing__hold__ws"] < 0 or stateout.nom_ff_n40C_1v95.metrics["timing__setup__ws"] < 0:
-        print("Timing Violated For nom_ff_n40C_1v95")
-        the_algorithm("nom_ff_n40C_1v95",  iterations)
-    else:
-        print("Timing Passed For nom_ff_n40C_1v95")
-'''
+
+        '''
+        # Disabled for now
+        if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
+            print("Timing Violated For nom_tt_025C_1v80")
+            the_algorithm("nom_tt_025C_1v80",  iterations)
+        else:
+            print("Timing Passed For nom_tt_025C_1v80")
+
+        if stateout.nom_ff_n40C_1v95.metrics["timing__hold__ws"] < 0 or stateout.nom_ff_n40C_1v95.metrics["timing__setup__ws"] < 0:
+            print("Timing Violated For nom_ff_n40C_1v95")
+            the_algorithm("nom_ff_n40C_1v95",  iterations)
+        else:
+            print("Timing Passed For nom_ff_n40C_1v95")
+        '''
