@@ -20,21 +20,25 @@ CONFIGURATIONS
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
+'''
 top_module = ["top"]
-#design_modules = ["array_multipli"]
-#design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
                  f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
                  f"{cwd_path}/../Design/Top/top.sv"]
+'''
+top_module = ["array_multiplier_top"]
+design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", 
+                f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
+
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 1.7
+clock_period = 1.5
 ## Number of iterations for the algorithm
 N_iterations = 40
 
@@ -406,8 +410,8 @@ def the_algorithm(condition, telemetry):
 SYNTHESIS
 '''
 flag_stop = False
+telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
 while not flag_stop:
-    telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
     backup_files = create_backup_files(design_paths)
     for iterations in range(N_iterations):
 
@@ -442,17 +446,21 @@ while not flag_stop:
             telemetry = temp_telemetry
         else:
             print("Timing Passed For nom_ss_100C_1v60")
+            print(clock_period)
             print(telemetry) 
             flag_stop = True
             break
 
         # input("Press Enter to continue...")  # Pause for user input
-
+    '''
     if not flag_stop:
         restore_backup_files(backup_files)
+        telemetry["attempted_pipeline_combinations"].clear()
+        telemetry["kill_count"] = 0
+        telemetry["kill"] = False
         clock_period += 0.1
         input("Press Enter To Continue With Increased Clock Period...")
-
+    '''
 
 
 '''

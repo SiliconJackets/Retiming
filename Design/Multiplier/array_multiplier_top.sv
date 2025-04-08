@@ -49,7 +49,6 @@ module array_multiplier_top #(
     .i_valid(i_valid),
     .o_valid(o_valid)
   ); 
-
-  assign Z_final = Z1 + Z2;
 */
+  assign Z_final = Z1;
 endmodule
