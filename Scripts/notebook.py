@@ -37,7 +37,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 1.7
+clock_period = 1.5
 ## Number of iterations for the algorithm
 N_iterations = 10
 
@@ -332,6 +332,21 @@ def the_algorithm(condition, telemetry):
             details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0], iterations)
     data_hash = hash(tuple(tuple(sorted(d.items())) for d in simplified))  # Compare hashs to see if we have tried this already. 
 
+    # Check for bad paths (Input to Register that is not closest, Register to Output that is not closest)
+    for data in simplified:
+        if data["startpoint"].module == "INPUT":
+            mask = data["endpoint"].pipeline_mask
+            stage = data["endpoint"].pipeline_stage
+            forward = mask[len(mask)-stage:]
+            if "1" in forward:
+                temp_telemetry["kill"] = True
+        if data["endpoint"].module == "OUTPUT":
+            mask = data["startpoint"].pipeline_mask
+            stage = data["startpoint"].pipeline_stage
+            forward = mask[:len(mask)-stage-1]
+            if "1" in forward:
+                temp_telemetry["kill"] = True
+
     # Setup and Update Telemetry
     temp_telemetry = copy.deepcopy(telemetry)
     temp_telemetry["iterations"] += 1   
@@ -370,6 +385,7 @@ def the_algorithm(condition, telemetry):
         print("Endpoint:", data["endpoint"].instance_id, data["endpoint"].module, data["endpoint"].pipeline_mask, data["endpoint"].pipeline_stage)
         print("Slack:", data["slack"])
         print("Violations:", data["violated"])
+
         if data["startpoint"].instance_id in changed_modules or data["endpoint"].instance_id in changed_modules:
             print("Already Modified This Iteration")
             print("----------------")
@@ -450,6 +466,7 @@ while not flag_stop:
             print(telemetry) 
             flag_stop = True
             break
+        input()
     
     if not flag_stop:
         restore_backup_files(backup_files)
@@ -458,8 +475,7 @@ while not flag_stop:
         telemetry["kill"] = False
         clock_period += 0.1
         input("Press Enter To Continue With Increased Clock Period...")
-    
-    input("Press Enter to continue...")  # Pause for user input
+
 
 
 
