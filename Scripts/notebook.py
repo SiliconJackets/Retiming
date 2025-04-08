@@ -7,6 +7,7 @@ import os
 import json
 import re
 import copy
+import shutil
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
@@ -35,7 +36,7 @@ clock_pin = "clk"
 ## Clock period
 clock_period = 1.7
 ## Number of iterations for the algorithm
-N_iterations = 10
+N_iterations = 40
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -69,6 +70,40 @@ def file_finder(string, file_list):
             if string in f.read():
                 return file
     return None
+
+
+def create_backup_files(file_paths):
+    """
+    Given a list of file paths, create a copy of each file in the same directory 
+    with the filename suffixed by '_backup'.
+    """
+    backup_file_paths = []
+    for original_path in file_paths:
+        directory, filename = os.path.split(original_path)
+        name, extension = os.path.splitext(filename)
+        backup_filename = f"{name}_backup{extension}"
+        backup_path = os.path.join(directory, backup_filename)
+        shutil.copy2(original_path, backup_path)
+        backup_file_paths.append(backup_path)
+
+    return backup_file_paths
+
+
+def restore_backup_files(backup_file_paths):
+    """
+    Given a list of backup file paths (e.g., 'example_backup.txt'), 
+    copy each backup file back to its original name (e.g., 'example.txt'),
+    overwriting the original if it exists.
+    """
+    for backup_path in backup_file_paths:
+        directory, filename = os.path.split(backup_path)
+        name, extension = os.path.splitext(filename)
+        if name.endswith('_backup'):
+            original_name = name[:-7]  # remove '_backup' from the filename
+            original_filename = original_name + extension
+            original_path = os.path.join(directory, original_filename)
+            shutil.copy2(backup_path, original_path)
+            os.remove(backup_path)
 
 
 def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails, pipeline_details: list):
@@ -370,49 +405,57 @@ def the_algorithm(condition, telemetry):
 '''
 SYNTHESIS
 '''
-telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
-for iterations in range(N_iterations):
+flag_stop = False
+while not flag_stop:
+    telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
+    backup_files = create_backup_files(design_paths)
+    for iterations in range(N_iterations):
 
-    print_available_steps()
+        print_available_steps()
 
-    Synthesis = Step.factory.get("Yosys.Synthesis")
-    synthesis = Synthesis(
-        VERILOG_FILES=FILES,
-        state_in=State(),
-    )
-    synthesis.start()
+        Synthesis = Step.factory.get("Yosys.Synthesis")
+        synthesis = Synthesis(
+            VERILOG_FILES=FILES,
+            state_in=State(),
+        )
+        synthesis.start()
 
-    # Static Timing Analysis Pre-PNR (STA Pre-PNR)
-    STAPrePNR = Step.factory.get("OpenROAD.STAPrePNR")
-    sta_pre_pnr = STAPrePNR(
-        PNR_SDC_FILE="pre_pnr_base.sdc",
-        VERILOG_FILES=FILES,
-        state_in=synthesis.state_out,  # Use the output state from synthesis as input state for STA Pre-PNR
-    )
-    sta_pre_pnr.start()
+        # Static Timing Analysis Pre-PNR (STA Pre-PNR)
+        STAPrePNR = Step.factory.get("OpenROAD.STAPrePNR")
+        sta_pre_pnr = STAPrePNR(
+            PNR_SDC_FILE="pre_pnr_base.sdc",
+            VERILOG_FILES=FILES,
+            state_in=synthesis.state_out,  # Use the output state from synthesis as input state for STA Pre-PNR
+        )
+        sta_pre_pnr.start()
 
-    # Parse Timing Data.
-    iterations = telemetry["iterations"]
-    stateout = StateOutMetrics(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/state_out.json")
-    if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
-        print("Timing Violated For nom_ss_100C_1v60")
-        temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
-        if temp_telemetry["kill"]:
-            print("Kill Condition Met")
-            print(temp_telemetry)
+        # Parse Timing Data.
+        iterations = telemetry["iterations"]
+        stateout = StateOutMetrics(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/state_out.json")
+        if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
+            print("Timing Violated For nom_ss_100C_1v60")
+            temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
+            if temp_telemetry["kill"]:
+                print("Kill Condition Met")
+                print(temp_telemetry)
+                break
+            telemetry = temp_telemetry
+        else:
+            print("Timing Passed For nom_ss_100C_1v60")
+            print(telemetry) 
+            flag_stop = True
             break
-        telemetry = temp_telemetry
-    else:
-        print("Timing Passed For nom_ss_100C_1v60")
-        print(telemetry)
-        break
 
-    input("Press Enter to continue...")  # Pause for user input
+        # input("Press Enter to continue...")  # Pause for user input
 
-
+    if not flag_stop:
+        restore_backup_files(backup_files)
+        clock_period += 0.1
+        input("Press Enter To Continue With Increased Clock Period...")
 
 
-    '''
+
+'''
     # Disabled for now
     if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
         print("Timing Violated For nom_tt_025C_1v80")
@@ -425,4 +468,4 @@ for iterations in range(N_iterations):
         the_algorithm("nom_ff_n40C_1v95",  iterations)
     else:
         print("Timing Passed For nom_ff_n40C_1v95")
-    '''
+'''
