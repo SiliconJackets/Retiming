@@ -378,6 +378,7 @@ for iterations in range(N_iterations):
     Synthesis = Step.factory.get("Yosys.Synthesis")
     synthesis = Synthesis(
         VERILOG_FILES=FILES,
+        SYNTH_HIERARCHY_MODE="flatten",
         state_in=State(),
     )
     synthesis.start()
