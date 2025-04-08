@@ -1,4 +1,4 @@
-(* keep_hierarchy = "yes" *)
+//(* keep_hierarchy = "yes" *)
 module pipeline_stage #(
    parameter WIDTH = 32,
    parameter ENABLE = 1

@@ -19,9 +19,14 @@ CONFIGURATIONS
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-top_module = ["array_multiplier_top"]
-design_modules = ["array_multiplier"]
-design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules+top_module]
+top_module = ["top"]
+#design_modules = ["array_multipli"]
+#design_paths = [f"{cwd_path}/../Design/Multiplier//{design_module}.sv" for design_module in design_modules]
+design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
+                 f"{cwd_path}/../Design/Divider/divider.sv",
+                 f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
+                 f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
+                 f"{cwd_path}/../Design/Top/top.sv"]
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
@@ -30,7 +35,7 @@ clock_pin = "clk"
 ## Clock period
 clock_period = 1.7
 ## Number of iterations for the algorithm
-N_iterations = 1
+N_iterations = 10
 
 FILES = [path for path in design_paths + lib_paths if path]
 Config.interactive(
@@ -255,13 +260,14 @@ def find_pipeline_stage(instance_name, module, top_module, iterations):
     num_enabled_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
 
     pipeline_details = {key : value for key, value in module.items() if mask in key}
-    pipeline_mask = [0]*num_pipelines
+    pipeline_mask = {}
     for key in pipeline_details.keys():
         if "ENABLE" in pipeline_details[key]["type"]:
             idx = num_pipelines - 1 - int(re.findall(r'\[(\d+)\]', key)[0])
             pipeline_mask[idx] = pipeline_details[key]["type"][-1]
-    
-    return num_pipelines, "".join(pipeline_mask), instance_id, num_enabled_pipeline_stages
+    mask = "".join(pipeline_mask[key] for key in sorted(pipeline_mask))
+    #print(mask)
+    return num_pipelines, mask, instance_id, num_enabled_pipeline_stages
 
 
 def the_algorithm(condition, telemetry):
@@ -288,6 +294,8 @@ def the_algorithm(condition, telemetry):
 
     # Process Data
     for i, details in enumerate(simplified):
+        print(details["startpoint"])
+        print(details["endpoint"])
         if details["startpoint"].module != "INPUT":
             details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0], iterations)
 

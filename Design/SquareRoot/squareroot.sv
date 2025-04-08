@@ -29,6 +29,7 @@ module sqrt_int #(
     parameter INSTANCE_ID = 0
 )(
     input  wire logic clk,
+    input  wire logic rst,
     input  wire logic i_valid,
     output      logic o_valid,
     input  wire logic [DATAWIDTH-1:0] rad,

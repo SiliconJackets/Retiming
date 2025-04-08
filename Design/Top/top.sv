@@ -40,7 +40,7 @@ logic o_valid_adder_tree;
 logic o_valid_sqrt;
 logic [DATAWIDTH:0] sqrt_out;
 logic [DATAWIDTH:0] sqrt_rem;
-logic [DATAWIDTH:0] R_out_divider;
+logic [DATAWIDTH:0] R_out_divider_A,R_out_divider_B,R_out_divider_C,R_out_divider_D;
 logic [DATAWIDTH*2+1:0] adderTree_out;
 
 array_multiplier #(
@@ -61,7 +61,7 @@ array_multiplier #(
 array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
     .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_MUL),
-    .INSTANCE_ID(0)
+    .INSTANCE_ID(1)
   )
   mul_B (
     .A(B),
@@ -76,7 +76,7 @@ array_multiplier #(
 array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
     .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_MUL),
-    .INSTANCE_ID(0)
+    .INSTANCE_ID(2)
   )
   mul_C (
     .A(C),
@@ -91,7 +91,7 @@ array_multiplier #(
 array_multiplier #(
     .DATAWIDTH(DATAWIDTH),
     .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_MUL),
-    .INSTANCE_ID(0)
+    .INSTANCE_ID(3)
   )
   mul_D (
     .A(D),
@@ -103,7 +103,7 @@ array_multiplier #(
     .o_valid(o_valid_D_mul)
   );
 
-logic [DATAWIDTH * 2-1:0] adder_in_data[0:3];
+logic [3:0][DATAWIDTH * 2-1:0] adder_in_data;
 assign adder_in_data[0] = A_mul;
 assign adder_in_data[1] = B_mul;
 assign adder_in_data[2] = C_mul;
@@ -113,7 +113,7 @@ adder_tree #(
   .DATAWIDTH(DATAWIDTH * 2),
   .NUM_INPUTS(4), // Maximum is 32
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_ADDT),
-  .INSTANCE_ID(1)
+  .INSTANCE_ID(0)
 )
 adder_tree0 (
   .clk(clk),
@@ -199,7 +199,7 @@ array_div_inst_A (
 array_divider #(
   .DATAWIDTH(DATAWIDTH + 1 + 8),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
-  .INSTANCE_ID(0)
+  .INSTANCE_ID(1)
 )
 array_div_inst_B (
   .clk(clk),
@@ -215,7 +215,7 @@ array_div_inst_B (
 array_divider #(
   .DATAWIDTH(DATAWIDTH + 1 + 8),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
-  .INSTANCE_ID(0)
+  .INSTANCE_ID(2)
 )
 array_div_inst_C (
   .clk(clk),
@@ -231,7 +231,7 @@ array_div_inst_C (
 array_divider #(
   .DATAWIDTH(DATAWIDTH + 1 + 8),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
-  .INSTANCE_ID(0)
+  .INSTANCE_ID(3)
 )
 array_div_inst_D (
   .clk(clk),

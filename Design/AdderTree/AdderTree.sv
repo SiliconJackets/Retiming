@@ -23,7 +23,7 @@ module adder_tree #(
   input  logic clk,
   input  logic rst,
   input  logic i_valid,
-  input  logic [DATAWIDTH-1:0] in_data [0:NUM_INPUTS-1],
+  input  logic [NUM_INPUTS-1:0][DATAWIDTH-1:0] in_data,
   output logic o_valid,
   output logic [DATAWIDTH + $clog2(NUM_INPUTS - 1) + 1:0] sum_reg
 );

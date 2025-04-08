@@ -108,27 +108,27 @@ module array_divider #(
   generate
     for (genvar i = 0; i < STAGE_MASK_WIDTH; i = i + 1) begin : divider_pipeline_stage
         if (i == 0) begin
-        pipeline_stage #(
+            pipeline_stage #(
               .WIDTH(4*DATAWIDTH + 1),
               .ENABLE(PIPELINE_STAGE_MASK[i])
             ) pipe_stage_inst (
               .clk(clk),
               .rst(rst),
-              .data_in({comb_rem0, comb_quo0, A_shift, B, i_valid}),
+              .data_in({comb_rem[0], comb_quo[0], A_shift, B, i_valid}),
               .data_out({partial_rem[0], partial_quo[0], D_pipe[0], B_pipe[0], i_valid_r[0]})
             );
         end else if (i == STAGE_MASK_WIDTH - 1) begin
             pipeline_stage #(
                 .WIDTH(4*DATAWIDTH + 1),
                 .ENABLE(PIPELINE_STAGE_MASK[i])
-                ) pipe_stage_inst (
+            ) pipe_stage_inst (
                 .clk(clk),
                 .rst(rst),
                 .data_in({comb_rem[i-1], comb_quo[i-1], D_pipe[i-1], B_pipe[i-1], i_valid_r[i-1]}),
                 .data_out({R_out, Q_out, D_pipe[i], B_pipe[i], o_valid})
                 );
         end else begin
-        pipeline_stage #(
+            pipeline_stage #(
               .WIDTH(4*DATAWIDTH + 1),
               .ENABLE(PIPELINE_STAGE_MASK[i])
             ) pipe_stage_inst (
