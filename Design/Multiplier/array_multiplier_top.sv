@@ -26,7 +26,7 @@ module array_multiplier_top #(
   mul0 (
     .A(A),
     .B(B),
-    .Z_final(Z1),
+    .Z_final(Z_final),
     .clk(clk),
     .rst(rst),
     .i_valid(i_valid),
@@ -50,5 +50,4 @@ module array_multiplier_top #(
     .o_valid(o_valid)
   ); 
 */
-  assign Z_final = Z1;
 endmodule

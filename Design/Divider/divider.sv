@@ -78,8 +78,8 @@ module array_divider #(
 
   // Partial remainder and partial quotient arrays (WIDTH bits each).
   // There are (WIDTH+1) stages (0 to WIDTH).
-  logic [DATAWIDTH-1:0] partial_rem0 = '0;
-  logic [DATAWIDTH-1:0] partial_quo0 = '0;
+  logic [DATAWIDTH-1:0] partial_rem0 = 'b0;
+  logic [DATAWIDTH-1:0] partial_quo0 = 'b0;
 
   logic [DATAWIDTH-1:0] partial_rem [0:DATAWIDTH];
   logic [DATAWIDTH-1:0] partial_quo [0:DATAWIDTH];

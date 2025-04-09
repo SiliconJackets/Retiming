@@ -30,14 +30,15 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
 '''
 top_module = ["array_multiplier_top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", 
-                f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
+                 f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
+
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 1.5
+clock_period = 3.0
 ## Number of iterations for the algorithm
 N_iterations = 10
 
@@ -332,6 +333,10 @@ def the_algorithm(condition, telemetry):
             details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0], iterations)
     data_hash = hash(tuple(tuple(sorted(d.items())) for d in simplified))  # Compare hashs to see if we have tried this already. 
 
+    # Setup and Update Telemetry
+    temp_telemetry = copy.deepcopy(telemetry)
+    temp_telemetry["iterations"] += 1  
+
     # Check for bad paths (Input to Register that is not closest, Register to Output that is not closest)
     for data in simplified:
         if data["startpoint"].module == "INPUT":
@@ -340,16 +345,14 @@ def the_algorithm(condition, telemetry):
             forward = mask[len(mask)-stage:]
             if "1" in forward:
                 temp_telemetry["kill"] = True
+                print("Kill Condition Met: Input to Register that is not closest")
         if data["endpoint"].module == "OUTPUT":
             mask = data["startpoint"].pipeline_mask
             stage = data["startpoint"].pipeline_stage
             forward = mask[:len(mask)-stage-1]
             if "1" in forward:
-                temp_telemetry["kill"] = True
-
-    # Setup and Update Telemetry
-    temp_telemetry = copy.deepcopy(telemetry)
-    temp_telemetry["iterations"] += 1   
+                temp_telemetry["kill"] = True 
+                print("Kill Condition Met: Register to Output that is not closest")
 
     if data_hash in temp_telemetry["attempted_pipeline_combinations"]:
         if temp_telemetry["kill_count"] >= 3:
@@ -435,7 +438,11 @@ while not flag_stop:
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
-            SYNTH_HIERARCHY_MODE="keep",
+            SYNTH_HIERARCHY_MODE="flatten",
+            SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
+            SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
+            SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping
+            SYNTH_ABC_BUFFERING=True,            # Enable cell buffering
             state_in=State(),
         )
         synthesis.start()

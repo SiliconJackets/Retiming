@@ -103,7 +103,7 @@ module array_multiplier #(
       if (i == DATAWIDTH - 2)
           assign cin_wire_hafa = P[DATAWIDTH][(i+1)*DATAWIDTH + (DATAWIDTH - 1)];
       else
-          assign cin_wire_hafa = S[2*(DATAWIDTH-2)][i];
+          assign cin_wire_hafa = S[2*(DATAWIDTH-2)+1][i];
 
       assign Z[2*(DATAWIDTH-1)+2][DATAWIDTH+i] = s_wire_hafa;
 
