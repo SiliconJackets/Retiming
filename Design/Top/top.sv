@@ -1,5 +1,6 @@
 module top #(
     parameter DATAWIDTH = 16,
+    parameter FRAC_BITS = 8,
     parameter NUM_PIPELINE_STAGES_MUL = 2,    
     parameter NUM_PIPELINE_STAGES_DIV = 2,    
     parameter NUM_PIPELINE_STAGES_SQRT = 2,    
@@ -181,7 +182,8 @@ endgenerate
 
 
 array_divider #(
-  .DATAWIDTH(DATAWIDTH + 1 + 8),
+  .DATAWIDTH(DATAWIDTH + 1),
+  .FRAC_BITS(FRAC_BITS),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
   .INSTANCE_ID(0)
 )
@@ -197,7 +199,8 @@ array_div_inst_A (
 );
 
 array_divider #(
-  .DATAWIDTH(DATAWIDTH + 1 + 8),
+  .DATAWIDTH(DATAWIDTH + 1),
+  .FRAC_BITS(FRAC_BITS),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
   .INSTANCE_ID(1)
 )
@@ -213,7 +216,8 @@ array_div_inst_B (
 );
 
 array_divider #(
-  .DATAWIDTH(DATAWIDTH + 1 + 8),
+  .DATAWIDTH(DATAWIDTH + 1),
+  .FRAC_BITS(FRAC_BITS),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
   .INSTANCE_ID(2)
 )
@@ -229,7 +233,8 @@ array_div_inst_C (
 );
 
 array_divider #(
-  .DATAWIDTH(DATAWIDTH + 1 + 8),
+  .DATAWIDTH(DATAWIDTH + 1),
+  .FRAC_BITS(FRAC_BITS),
   .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_DIV),
   .INSTANCE_ID(3)
 )
