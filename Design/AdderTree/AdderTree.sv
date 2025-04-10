@@ -44,6 +44,8 @@ module adder_tree #(
       localparam CUR_INPUTS = NUM_INPUTS;
       localparam OUT_W = DATAWIDTH;
       if (s == 0) begin
+          logic [CUR_INPUTS*OUT_W:0] input_stage, output_stage; 
+
           logic [CUR_INPUTS*OUT_W-1:0] bundle_in;
           logic [CUR_INPUTS*OUT_W-1:0] bundle_out;
 
@@ -52,23 +54,32 @@ module adder_tree #(
             assign stage_data[0][i] = bundle_out[i*OUT_W +: OUT_W];
           end
 
+
+          assign input_stage = {bundle_in, i_valid};
+          assign {bundle_out, valid_r[0]} = output_stage;
+
           pipeline_stage #(
             .WIDTH(CUR_INPUTS * OUT_W + 1),
             .ENABLE(PIPELINE_STAGE_MASK[s])
           ) pipe_stage_input (
             .clk(clk), .rst(rst),
-            .data_in({bundle_in, i_valid}),
-            .data_out({bundle_out, valid_r[0]})
+            .data_in(input_stage),
+            .data_out(output_stage)
           );
         end
       else if (s == STAGE_MASK_WIDTH-1) begin
+        logic [OUT_W :0] input_stage, output_stage; 
+
+        assign input_stage = {comb_result[s-1][0], valid_r[s-1]};
+        assign {sum_reg, o_valid} = output_stage;
+
         pipeline_stage #(
           .WIDTH(OUT_W + 1),
           .ENABLE(PIPELINE_STAGE_MASK[s])
         ) pipe_stage_input (
           .clk(clk), .rst(rst),
-          .data_in({comb_result[s-1][0], valid_r[s-1]}),
-          .data_out({sum_reg, o_valid})
+          .data_in(input_stage),
+          .data_out(output_stage)
         );
       end else begin
         localparam int OUT_W = DATAWIDTH + s;
