@@ -129,6 +129,7 @@ adder_tree0 (
 
 sqrt_int #(
   .DATAWIDTH(DATAWIDTH * 2 + 2),
+  .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES_SQRT),
   .INSTANCE_ID(0)
 )
 sqrt_inst (
@@ -142,8 +143,32 @@ sqrt_inst (
 
 logic [DATAWIDTH*4-1:0] stage_dividend_data [0:NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT - 1];
 generate 
-  for (genvar s = 0; s < NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT +NUM_PIPELINE_STAGES_ADDT; s++) begin : Dividend_pipeline_stage
-    if (s == 0) begin
+  for (genvar s = 0; s < NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT + 1; s++) begin : Dividend_pipeline_stage
+    // Handle the case when everything is purely combinational logic BEFORE the divider
+    if (NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT == 0) begin
+      pipeline_stage #(
+          .WIDTH(DATAWIDTH * 4),
+          .ENABLE(0)
+        ) pipe_stage_input (
+          .clk(clk), 
+          .rst(rst),
+          .data_in({A, B, C, D}),
+          .data_out({A_dividend, B_dividend, C_dividend, D_dividend})
+        );
+    end
+    // Handle the case when there is only one pipeline stage BEFORE the divider
+    if (s == 1 && NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT == 1) begin
+      pipeline_stage #(
+          .WIDTH(DATAWIDTH * 4),
+          .ENABLE(0)
+        ) pipe_stage_input (
+          .clk(clk), 
+          .rst(rst),
+          .data_in({stage_dividend_data[0]}),
+          .data_out({A_dividend, B_dividend, C_dividend, D_dividend})
+        );
+    end
+    else if (s == 0) begin
       pipeline_stage #(
           .WIDTH(DATAWIDTH * 4),
           .ENABLE(1)
@@ -154,10 +179,10 @@ generate
           .data_out({stage_dividend_data[0]})
         );
     end
-    else if (s == NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT - 1) begin
+    else if (s == NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT) begin
       pipeline_stage #(
           .WIDTH(DATAWIDTH * 4),
-          .ENABLE(1)
+          .ENABLE(0)
         ) pipe_stage_input (
           .clk(clk), 
           .rst(rst),

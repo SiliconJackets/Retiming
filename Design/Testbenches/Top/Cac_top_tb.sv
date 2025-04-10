@@ -32,10 +32,10 @@ initial begin
 end
 top #(
     .DATAWIDTH(16),
-    .NUM_PIPELINE_STAGES_MUL(2),
-    .NUM_PIPELINE_STAGES_DIV(2),
-    .NUM_PIPELINE_STAGES_SQRT(1),
-    .NUM_PIPELINE_STAGES_ADDT(2)
+    .NUM_PIPELINE_STAGES_MUL(1),
+    .NUM_PIPELINE_STAGES_DIV(0),
+    .NUM_PIPELINE_STAGES_SQRT(0),
+    .NUM_PIPELINE_STAGES_ADDT(0)
   )
   top0 (
     .clk(clk),
@@ -57,8 +57,9 @@ top #(
   );
 
 
-always @(posedge clk) begin
-  $display("Time=%0t | rst=%b | i_valid=%b | A=%h | B=%h | C=%h | D=%h | \
+// always @(posedge clk) begin
+initial begin
+  $monitor("Time=%0t | rst=%b | i_valid=%b | A=%h | B=%h | C=%h | D=%h | \
            output_final_A=%h | output_final_B=%h | output_final_C=%h | output_final_D=%h | valid=%b",
            $time, rst, i_valid, A, B, C, D,
           //  o_valid_final_A, o_valid_final_B, o_valid_final_C, o_valid_final_D,
@@ -73,7 +74,7 @@ initial begin
     rst = 1;
     i_valid = 0;
     // Dividend = 24'h040000;
-    #50;
+    #10;
     rst = 0;
     A = 16'h0000;
     B = 16'h0000;
