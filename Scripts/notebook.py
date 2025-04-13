@@ -8,6 +8,7 @@ import json
 import re
 import copy
 import shutil
+import subprocess
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
@@ -28,9 +29,13 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
                  f"{cwd_path}/../Design/Top/top.sv"]
 '''
-top_module = ["array_multiplier_top"]
-design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", 
-                 f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
+
+top_module = ["top"]
+design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
+                 f"{cwd_path}/../Design/Divider/divider.sv",
+                 f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
+                 f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
+                 f"{cwd_path}/../Design/Top/top.sv"]
 
 ## Library Modules
 lib_modules = ["pipeline_stage"]
@@ -263,41 +268,26 @@ def modify_pipeline_mask(instance_id, custom_mask, file_path):
     with open(file_path, 'w') as f:
         f.write(new_content)
 
-
-def find_pipeline_stage(instance_name, module, top_module, iterations):
-    '''
-    Given an instance name and module, return the pipeline stage and pipeline mask.
-    Args:
-        instance_name: The name of the instance
-        module: The module name
-        top_module: The top module name
-    Returns:
-        num_pipelines: The number of pipeline stages
-        pipeline_mask: The pipeline mask
-        instance_id: The instance id
-        num_enabled_pipeline_stages: The number of enabled pipeline stages
-    '''
-    with open(f"./openlane_run/{2*iterations+1}-yosys-synthesis/{top_module}.nl.v.json", 'r') as f:
+def find_pipeline_stage(module_name, top_module="top", iterations=None):
+    with open(f"./openlane_run/{2*iterations+1}-yosys-synthesis/raw_netlist.json", 'r') as f:
         data = json.load(f)
-    module_key = data["modules"][top_module]["cells"][instance_name]["type"]
+    module_key = data["modules"][top_module]["cells"][module_name]["type"]
     
-    mask = f"{module}_pipeline_stage"
-    module = data["modules"][module_key]["cells"]
-
     datawidth = int(data["modules"][module_key]["parameter_default_values"]["DATAWIDTH"], 2)
-    num_pipelines = datawidth + 2
     instance_id = int(data["modules"][module_key]["parameter_default_values"]["INSTANCE_ID"], 2)
-    num_enabled_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
+    num_pipeline_stages = int(data["modules"][module_key]["parameter_default_values"]["NUM_PIPELINE_STAGES"], 2)
+    
+    rest_data = data["modules"][module_key]["cells"]
+    filtered_data = {k: v for k, v in rest_data.items() if "_pipeline_stage" in k}
 
-    pipeline_details = {key : value for key, value in module.items() if mask in key}
     pipeline_mask = {}
-    for key in pipeline_details.keys():
-        if "ENABLE" in pipeline_details[key]["type"]:
-            idx = num_pipelines - 1 - int(re.findall(r'\[(\d+)\]', key)[0])
-            pipeline_mask[idx] = pipeline_details[key]["type"][-1]
+    for key in filtered_data.keys():
+        if "ENABLE" in filtered_data[key]["type"]:
+            idx = num_pipeline_stages - 1 - int(re.findall(r'\[(\d+)\]', key)[0])
+            pipeline_mask[idx] = filtered_data[key]["type"][-1]
     mask = "".join(pipeline_mask[key] for key in sorted(pipeline_mask))
-    #print(mask)
-    return num_pipelines, mask, instance_id, num_enabled_pipeline_stages
+
+    return len(mask), mask, instance_id, num_pipeline_stages
 
 
 def the_algorithm(condition, telemetry):
@@ -327,10 +317,10 @@ def the_algorithm(condition, telemetry):
         print(details["startpoint"])
         print(details["endpoint"])
         if details["startpoint"].module != "INPUT":
-            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, details["startpoint"].module, top_module[0], iterations)
+            details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, top_module[0], iterations)
 
         if details["endpoint"].module != "OUTPUT":
-            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, details["endpoint"].module, top_module[0], iterations)
+            details["endpoint"].num_pipeline_stages, details["endpoint"].pipeline_mask, details["endpoint"].instance_id, details["endpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["endpoint"].instance_name, top_module[0], iterations)
     data_hash = hash(tuple(tuple(sorted(d.items())) for d in simplified))  # Compare hashs to see if we have tried this already. 
 
     # Setup and Update Telemetry
@@ -421,9 +411,16 @@ SYNTHESIS
 flag_stop = False
 telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
 while not flag_stop:
-    backup_files = create_backup_files(design_paths)
+    #backup_files = create_backup_files(design_paths)
     for iterations in range(N_iterations):
         print_available_steps()
+
+        # Dumping raw netlist
+        verilog_str = " ".join(FILES)
+        yosys_cmd = f'mkdir -p ./openlane_run/{2*iterations+1}-yosys-synthesis; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/{2*iterations+1}-yosys-synthesis/raw_netlist.json"'
+        # Run Yosys comman
+        subprocess.run(yosys_cmd, shell=True, check=True)
+        print("Yosys ran successfully!")
 
         Config.interactive(
             top_module[0],  # Assume first element of top_module list is the top module
@@ -438,7 +435,7 @@ while not flag_stop:
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
-            SYNTH_HIERARCHY_MODE="flatten",
+            SYNTH_HIERARCHY_MODE="keep",
             SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
             SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
             SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping
