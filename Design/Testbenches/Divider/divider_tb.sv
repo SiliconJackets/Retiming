@@ -3,10 +3,11 @@
 module tb_array_divider;
 
   // Parameters for the divider
-  parameter int WIDTH     = 16;
-  parameter int NUM_TESTS = 10;
+  parameter int WIDTH     = 18;
+  parameter int NUM_TESTS = 25;
+  parameter int FRAC_BITS = 8;
   parameter int INSTANCE_ID = 0;
-  parameter int NUM_PIPELINE_STAGES = 17;
+  parameter int NUM_PIPELINE_STAGES = 0;
   // parameter logic [WIDTH-1:0] MASK = 8'b0110_0000;
   // parameter bit ENABLE = 1;
 
@@ -16,8 +17,8 @@ module tb_array_divider;
   logic i_valid;
 
   // 3-bit unsigned inputs (dividend and divisor)
-  logic [WIDTH-1:0] A;
-  logic [WIDTH-1:0] B;
+  logic [WIDTH-1+FRAC_BITS:0] A;
+  logic [WIDTH-1+FRAC_BITS:0] B;
 
   // Outputs from the divider
   logic o_valid;
@@ -25,13 +26,14 @@ module tb_array_divider;
   logic [WIDTH-1:0] R_out;  // Registered remainder
   logic [WIDTH-1:0] Q;      // Combinational quotient
   logic [WIDTH-1:0] R;      // Combinational remainder
-  logic [WIDTH-1:0] exp_Q;
-  logic [WIDTH-1:0] exp_R;
+  logic [WIDTH-1+FRAC_BITS:0] exp_Q;
+  logic [WIDTH-1+FRAC_BITS:0] exp_R;
 
   // Instantiate the unsigned array divider (Unit Under Test)
   array_divider #(
     .DATAWIDTH(WIDTH),
     .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES),
+    .FRAC_BITS(FRAC_BITS),
     .INSTANCE_ID(INSTANCE_ID)
   ) uut (
     .clk(clk),
@@ -53,51 +55,42 @@ module tb_array_divider;
   // Test vector structure and queue for expected results.
   //-------------------------------------------------------------------------
   typedef struct {
-    logic [WIDTH-1:0] A;
-    logic [WIDTH-1:0] B;
-    logic [WIDTH-1:0] exp_Q;
-    logic [WIDTH-1:0] exp_R;
+    logic [WIDTH-1+FRAC_BITS:0] A;
+    logic [WIDTH-1+FRAC_BITS:0] B;
+    logic [WIDTH-1+FRAC_BITS:0] exp_Q;
+    logic [WIDTH-1+FRAC_BITS:0] exp_R;
   } test_vector_t;
-
+    logic [WIDTH+FRAC_BITS-1:0] A_shifted;
   // Define test vectors (all positive)
   test_vector_t tests [NUM_TESTS];
   initial begin
-    // 7 / 3 = 2 remainder 1
-    tests[0] = '{ A: 1024, B: 10, exp_Q: 102, exp_R: 4 };
-    // 6 / 2 = 3 remainder 0
-    tests[1] = '{ A: 2439, B:300, exp_Q: 8, exp_R: 39 };
-    // 5 / 2 = 2 remainder 1
-    tests[2] = '{ A: 5, B: 2, exp_Q: 2, exp_R: 1 };
-    // 4 / 3 = 1 remainder 1
-    tests[3] = '{ A: 4, B: 3, exp_Q: 1, exp_R: 1 };
-    // 2 / 3 = 0 remainder 2
-    tests[4] = '{ A: 2, B: 3, exp_Q: 0, exp_R: 2 };
-    // 7 / 1 = 7 remainder 0
-    tests[5] = '{ A: 50, B: 1, exp_Q: 50, exp_R: 0 };
-    // 7 / 3 = 2 remainder 1
-    tests[6] = '{ A: 7, B: 3, exp_Q: 2, exp_R: 1 };
-    // 6 / 2 = 3 remainder 0
-    tests[7] = '{ A: 30, B: 2, exp_Q: 15, exp_R: 0 };
-    // 5 / 2 = 2 remainder 1
-    tests[8] = '{ A: 5, B: 2, exp_Q: 2, exp_R: 1 };
-    // 4 / 3 = 1 remainder 1
-    tests[9] = '{ A: 4, B: 3, exp_Q: 1, exp_R: 1 };
+  for (int i = 0; i < NUM_TESTS; i++) begin
+    tests[i].A = $urandom_range(0, (1 << (WIDTH-1)) - 1);
+    // tests[i].B = $urandom_range(0, (1 << (WIDTH-1)) - 1); 
+    tests[i].B = $urandom_range(tests[i].A + 1, (1 << (WIDTH-1)) - 1); 
+    A_shifted = (tests[i].A << FRAC_BITS); 
+    tests[i].exp_Q = (A_shifted) / tests[i].B;
+    tests[i].exp_R = (A_shifted) - (tests[i].B * tests[i].exp_Q);
+    $display("Test %0d: A = %0h, B = %0h, A_shifted = %0h, exp_Q = %0h, exp_R = %0h", 
+             i, tests[i].A, tests[i].B, A_shifted, tests[i].exp_Q, tests[i].exp_R);
   end
+end
 
   // Queue to store expected results for each input.
   test_vector_t pipeline_queue[$];
   int test_index = 0;
-
+  int count = 0;
+  int isPass;
   //-------------------------------------------------------------------------
   // Continuous input: On every rising edge, a new test vector is applied.
   //-------------------------------------------------------------------------
-    initial begin
-        // Configure FSDB dumping
-        $fsdbDumpon;
-        $fsdbDumpfile("simulation.fsdb");
-        $fsdbDumpvars(0, tb_array_divider, "+mda", "+all", "+trace_process");
-        $fsdbDumpMDA;
-    end
+  initial begin
+      // Configure FSDB dumping
+      $fsdbDumpon;
+      $fsdbDumpfile("simulation.fsdb");
+      $fsdbDumpvars(0, tb_array_divider, "+mda", "+all", "+trace_process");
+      $fsdbDumpMDA;
+  end
   initial begin
     $vcdpluson; //set up trace dump for DVE
     $vcdplusmemon;
@@ -106,7 +99,7 @@ module tb_array_divider;
     i_valid = 0;
     A = '0;
     B = '0;
-    #20; // Hold reset for 20 ns
+    @(posedge clk);
     rst = 0;
     i_valid = 1; // Continuous valid
 
@@ -125,30 +118,25 @@ module tb_array_divider;
         B = tests[NUM_TESTS-1].B;
         exp_Q = tests[NUM_TESTS-1].exp_Q;
         exp_R = tests[NUM_TESTS-1].exp_R;
+        i_valid = 0;
       end
       
       @(posedge clk);
-      $display("Time=%0t: Input A=%0d, B=%0d | Q_out=%0d, R_out=%0d, o_valid=%0d | exp_Q = %0d, exp_R = %0d",
-               $time, A, B, Q_out, R_out, o_valid, exp_Q, exp_R);
+      $display("Cycle %0d: Input A=%0d, B=%0d | Q_out=%0d (hex:%0h), R_out=%0d (hex:%0h), o_valid=%0d",
+               count, A, B, Q_out, Q_out, R_out, R_out, o_valid);
+      if (Q_out  == tests[count-NUM_PIPELINE_STAGES].exp_Q && R_out  == tests[count-NUM_PIPELINE_STAGES].exp_R) begin
+        $display("Pass!");
+      end
+      else if (o_valid) begin
+        $display("Not pass: exp_Q = %0d (hex:%0h), exp_R = %0d (hex:%0h)",
+               tests[count-NUM_PIPELINE_STAGES].exp_Q, tests[count-NUM_PIPELINE_STAGES].exp_Q, tests[count-NUM_PIPELINE_STAGES].exp_R, tests[count-NUM_PIPELINE_STAGES].exp_R);
+      end
+      count = count + 1;
     end
   end
 
-  //-------------------------------------------------------------------------
-  // Monitor output: When o_valid is asserted, pop the earliest expected result
-  // from the queue and display the output versus the expected values.
-  //-------------------------------------------------------------------------
-  // always_ff @(posedge clk) begin
-  //   // if (o_valid && pipeline_queue.size() > 0) begin
-  //   if ( pipeline_queue.size() > 0) begin
-  //     test_vector_t tv;
-  //     // tv = pipeline_queue.pop_front();
-  //     $display("Time=%0t: Input A=%0d, B=%0d | Q_out=%0d, R_out=%0d, o_valid=%0d",
-  //              $time, A, B, Q_out, R_out, o_valid);
-  //   end
-  // end
-
   initial begin
-    #300;
+    #350;
     $finish;
   end
 
