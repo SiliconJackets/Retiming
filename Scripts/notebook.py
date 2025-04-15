@@ -312,8 +312,8 @@ def find_pipeline_stage(module_name, top_module="top", iterations=None):
         if "ENABLE" in filtered_data[key]["type"]:
             idx = num_pipeline_stages - 1 - int(re.findall(r'\[(\d+)\]', key)[0])
             pipeline_mask[idx] = filtered_data[key]["type"][-1]
-    mask = "".join(pipeline_mask[key] for key in sorted(pipeline_mask))
 
+    mask = "".join(pipeline_mask[key] for key in sorted(pipeline_mask))
     return len(mask), mask, instance_id, num_pipeline_stages
 
 
@@ -357,14 +357,16 @@ def the_algorithm(condition, telemetry):
 
     # Check for bad paths (Input to Register that is not closest, Register to Output that is not closest)
     for data in simplified:
-        if data["startpoint"].module == "INPUT":
+        if data["startpoint"].module == "INPUT" and data["endpoint"].module != "OUTPUT":
+            #Input to output path becaause of pipeline stages at top
             mask = data["endpoint"].pipeline_mask
             stage = data["endpoint"].pipeline_stage
             forward = mask[len(mask)-stage:]
             if "1" in forward:
                 temp_telemetry["kill"] = True
                 print("Kill Condition Met: Input to Register that is not closest")
-        if data["endpoint"].module == "OUTPUT":
+        if data["endpoint"].module == "OUTPUT" and data["startpoint"].module != "INPUT": 
+            #Input to output path becaause of pipeline stages at top
             mask = data["startpoint"].pipeline_mask
             stage = data["startpoint"].pipeline_stage
             forward = mask[:len(mask)-stage-1]
@@ -499,7 +501,7 @@ while not flag_stop:
             print(telemetry) 
             flag_stop = True
             break
-        # input()
+        input()
     
     if not flag_stop:
         restore_backup_files(backup_files)

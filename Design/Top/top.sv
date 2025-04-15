@@ -1,10 +1,10 @@
 module top #(
     parameter DATAWIDTH = 8,
     parameter FRAC_BITS = 8,
-    parameter NUM_PIPELINE_STAGES_MUL = 2,    
-    parameter NUM_PIPELINE_STAGES_DIV = 2,    
+    parameter NUM_PIPELINE_STAGES_MUL = 0,    
+    parameter NUM_PIPELINE_STAGES_DIV = 0,    
     parameter NUM_PIPELINE_STAGES_SQRT = 0,    
-    parameter NUM_PIPELINE_STAGES_ADDT = 2
+    parameter NUM_PIPELINE_STAGES_ADDT = 0
 )
 (
     input clk,
@@ -24,7 +24,7 @@ module top #(
     output logic [2*DATAWIDTH+1:0]output_final_C,
     output logic [2*DATAWIDTH+1:0]output_final_D
 );
-
+localparam TOTAL_PIPELINE_STAGES = NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT;
 logic [DATAWIDTH*2-1:0] A_mul;
 logic [DATAWIDTH*2-1:0] B_mul;
 logic [DATAWIDTH*2-1:0] C_mul;
@@ -141,86 +141,41 @@ sqrt_inst (
   .rem(sqrt_rem)
 );
 
-logic [DATAWIDTH*4-1:0] stage_dividend_data [0:NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT - 1];
-generate 
-  for (genvar s = 0; s < NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT + 1; s++) begin : Dividend_pipeline_stage
-    // Handle the case when everything is purely combinational logic BEFORE the divider
-    if (NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT == 0) begin
-      logic [4*DATAWIDTH-1:0] input_stage, output_stage; 
+generate
+  if (TOTAL_PIPELINE_STAGES == 0) begin
+    assign A_dividend = A;
+    assign B_dividend = B;
+    assign C_dividend = C;
+    assign D_dividend = D;
+  end else begin
+    logic [DATAWIDTH*4-1:0] stage_dividend_data [0:TOTAL_PIPELINE_STAGES-1];
 
-      assign input_stage = {A, B, C, D};
-      assign {A_dividend, B_dividend, C_dividend, D_dividend} = output_stage;
+    for (genvar s = 0; s < TOTAL_PIPELINE_STAGES; s++) begin : Dividend_pipeline_stage
+      logic [4*DATAWIDTH-1:0] input_stage, output_stage;
+
+      if (s == 0) begin
+        assign input_stage = {A, B, C, D};
+      end else begin
+        assign input_stage = stage_dividend_data[s-1];
+      end
+
       pipeline_stage #(
-          .WIDTH(DATAWIDTH * 4),
-          .ENABLE(0)
-        ) pipe_stage_input (
-          .clk(clk), 
-          .rst(rst),
-          .data_in(input_stage),
-          .data_out(output_stage)
-        );
+        .WIDTH(DATAWIDTH * 4),
+        .ENABLE(1)
+      ) pipe_stage_input (
+        .clk(clk),
+        .rst(rst),
+        .data_in(input_stage),
+        .data_out(output_stage)
+      );
+
+      assign stage_dividend_data[s] = output_stage;
     end
-    // Handle the case when there is only one pipeline stage BEFORE the divider
-    if (s == 1 && NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT == 1) begin
-      logic [4*DATAWIDTH-1:0] input_stage, output_stage; 
-      assign input_stage = {stage_dividend_data[0]};
-      assign {A_dividend, B_dividend, C_dividend, D_dividend} = output_stage;
-      pipeline_stage #(
-          .WIDTH(DATAWIDTH * 4),
-          .ENABLE(0)
-        ) pipe_stage_input (
-          .clk(clk), 
-          .rst(rst),
-          .data_in(input_stage),
-          .data_out(output_stage)
-        );
-    end
-    else if (s == 0) begin
-      logic [4*DATAWIDTH-1:0] input_stage, output_stage; 
-      assign input_stage = {A, B, C, D};
-      assign {stage_dividend_data[0]} = output_stage;
-      pipeline_stage #(
-          .WIDTH(DATAWIDTH * 4),
-          .ENABLE(1)
-        ) pipe_stage_input (
-          .clk(clk), 
-          .rst(rst),
-          .data_in(input_stage),
-          .data_out(output_stage)
-        );
-    end
-    else if (s == NUM_PIPELINE_STAGES_MUL + NUM_PIPELINE_STAGES_SQRT + NUM_PIPELINE_STAGES_ADDT) begin
-      logic [4*DATAWIDTH-1:0] input_stage, output_stage; 
-      assign input_stage = {stage_dividend_data[s-1]};
-      assign {A_dividend, B_dividend, C_dividend, D_dividend} = output_stage;
-      pipeline_stage #(
-          .WIDTH(DATAWIDTH * 4),
-          .ENABLE(0)
-        ) pipe_stage_input (
-          .clk(clk), 
-          .rst(rst),
-          .data_in(input_stage),
-          .data_out(output_stage)
-        );
-    end
-    else begin
-      logic [4*DATAWIDTH-1:0] input_stage, output_stage; 
-      assign input_stage = {stage_dividend_data[s-1]};
-      assign {stage_dividend_data[s]} = output_stage;
-      pipeline_stage #(
-          .WIDTH(DATAWIDTH * 4),
-          .ENABLE(1)
-        ) pipe_stage_input (
-          .clk(clk), 
-          .rst(rst),
-          .data_in(input_stage),
-          .data_out(output_stage)
-        );
-    end
+
+    // Split final stage output into individual signals
+    assign {A_dividend, B_dividend, C_dividend, D_dividend} = stage_dividend_data[TOTAL_PIPELINE_STAGES-1];
   end
-endgenerate 
-
-
+endgenerate
 
 array_divider #(
   .DATAWIDTH(2*DATAWIDTH + 2),
