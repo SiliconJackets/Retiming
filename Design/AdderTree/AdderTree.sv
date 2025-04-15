@@ -66,6 +66,7 @@ module adder_tree #(
           );
         end
       else if (s == STAGE_MASK_WIDTH-1) begin
+        localparam int OUT_W = DATAWIDTH + s;
         logic [OUT_W :0] input_stage, output_stage; 
 
         assign input_stage = {comb_result[s-1][0], valid_r[s-1]};
