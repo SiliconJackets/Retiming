@@ -29,10 +29,10 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
                  f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
-                 f"{cwd_path}/../Design/Top/top.sv"]
+                 f"{cwd_path}/../Design/Top/top.sv"] 
 '''
-top_module = ["array_multiplier_top"]
-design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
+top_module = ["sqrt_int"]
+design_paths = [f"{cwd_path}/../Design/SquareRoot/squareroot.sv"]
 '''
 ## Library Modules
 lib_modules = ["pipeline_stage"]
@@ -311,8 +311,8 @@ def find_pipeline_stage(module_name, top_module="top", iterations=None):
         if "ENABLE" in filtered_data[key]["type"]:
             idx = num_pipeline_stages - 1 - int(re.findall(r'\[(\d+)\]', key)[0])
             pipeline_mask[idx] = filtered_data[key]["type"][-1]
-    mask = "".join(pipeline_mask[key] for key in sorted(pipeline_mask))
 
+    mask = "".join(pipeline_mask[key] for key in sorted(pipeline_mask))
     return len(mask), mask, instance_id, num_pipeline_stages
 
 
@@ -356,14 +356,16 @@ def the_algorithm(condition, telemetry):
 
     # Check for bad paths (Input to Register that is not closest, Register to Output that is not closest)
     for data in simplified:
-        if data["startpoint"].module == "INPUT":
+        if data["startpoint"].module == "INPUT" and data["endpoint"].module != "OUTPUT":
+            #Input to output path becaause of pipeline stages at top
             mask = data["endpoint"].pipeline_mask
             stage = data["endpoint"].pipeline_stage
             forward = mask[len(mask)-stage:]
             if "1" in forward:
                 temp_telemetry["kill"] = True
                 print("Kill Condition Met: Input to Register that is not closest")
-        if data["endpoint"].module == "OUTPUT":
+        if data["endpoint"].module == "OUTPUT" and data["startpoint"].module != "INPUT": 
+            #Input to output path becaause of pipeline stages at top
             mask = data["startpoint"].pipeline_mask
             stage = data["startpoint"].pipeline_stage
             forward = mask[:len(mask)-stage-1]
@@ -463,7 +465,7 @@ while not flag_stop:
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
-            SYNTH_HIERARCHY_MODE="keep",
+            SYNTH_HIERARCHY_MODE="flatten",
             SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
             SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
             SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping

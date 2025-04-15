@@ -1,3 +1,8 @@
+/*
+Credit to https://projectf.io/posts/square-root-in-verilog/ for algorithm
+
+Unsigned Square Root with Pipeline Support
+*/
 module sqrt_stage #(
     parameter DATAWIDTH = 8
 )(
@@ -46,6 +51,10 @@ module sqrt_int #(
     logic [DATAWIDTH-1:0] q [ITERATIONS:0];
     logic [DATAWIDTH+1:0] ac [ITERATIONS:0];
 
+    logic [DATAWIDTH-1:0] x_stage [ITERATIONS:0];
+    logic [DATAWIDTH-1:0] q_stage [ITERATIONS:0];
+    logic [DATAWIDTH+1:0] ac_stage [ITERATIONS:0];
+
     logic [DATAWIDTH-1:0] rad_reg;
 
     genvar i, j;
@@ -55,6 +64,22 @@ module sqrt_int #(
 
     assign {ac[0], x[0]} = (valid[0]) ? {{DATAWIDTH{1'b0}}, rad_reg, 2'b0} : '0;
     assign q[0] = '0;
+
+    // Generate intermediate squareroot modules
+    generate
+        for (i = 1; i < STAGE_MASK_WIDTH - 1; i = i + 1) begin : sqrt_module
+            sqrt_stage #(
+                .DATAWIDTH(DATAWIDTH)  
+            ) stage_inst (
+                .ac(ac[i-1]),
+                .x(x[i-1]),
+                .q(q[i-1]),
+                .ac_next(ac_stage[i]),
+                .x_next(x_stage[i]),
+                .q_next(q_stage[i])
+            );
+        end
+    endgenerate
 
     // Generate pipeline stages
     generate
@@ -102,26 +127,11 @@ module sqrt_int #(
                 );
             
             end else begin
-
-                logic [DATAWIDTH+1:0] ac_buff;
-                logic [DATAWIDTH-1:0] q_buff;
-                logic [DATAWIDTH-1:0] x_buff;
-
-                sqrt_stage #(
-                    .DATAWIDTH(DATAWIDTH)  
-                ) stage_inst (
-                    .ac(ac[i-1]),
-                    .x(x[i-1]),
-                    .q(q[i-1]),
-                    .ac_next(ac_buff),
-                    .x_next(x_buff),
-                    .q_next(q_buff)
-                );
                 
                 // Need to pass ac, x, q, and valid
                 logic [3*DATAWIDTH + 2:0] input_stage, output_stage;
 
-                assign input_stage = {x_buff, q_buff, ac_buff, valid[i-1]};
+                assign input_stage = {x_stage[i], q_stage[i], ac_stage[i], valid[i-1]};
                 assign {x[i], q[i], ac[i], valid[i]} = output_stage;
 
                 pipeline_stage #(
@@ -134,11 +144,8 @@ module sqrt_int #(
                     .data_in(input_stage),
                     .data_out(output_stage)
                 );
-
             end
-
         end
-
     endgenerate
     
 endmodule

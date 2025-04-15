@@ -86,7 +86,8 @@ module array_divider #(
   logic [DATAWIDTH-1:0] comb_rem [0:DATAWIDTH+FRAC_BITS]; //0:1
   logic [DATAWIDTH-1:0] comb_quo [0:DATAWIDTH+FRAC_BITS]; //0:1
   
-  
+  logic [DATAWIDTH-1:0] Q_out_calc, R_out_calc;
+
   generate
     // if (ENABLE) begin : row_stages  // only 0
       for (genvar i = 0; i < DATAWIDTH + FRAC_BITS; i = i + 1) begin : comb_stage_loop
@@ -126,7 +127,7 @@ module array_divider #(
             logic [4*DATAWIDTH + 1 + FRAC_BITS-1:0] input_stage, output_stage; 
 
             assign input_stage = {comb_rem[i-1], comb_quo[i-1], D_pipe[i-1], B_pipe[i-1], i_valid_r[i-1]};
-            assign {R_out, Q_out, D_pipe[i], B_pipe[i], o_valid} = output_stage;
+            assign {R_out_calc, Q_out_calc, D_pipe[i], B_pipe[i], o_valid} = output_stage;
             pipeline_stage #(
                 .WIDTH(4*DATAWIDTH + 1 + FRAC_BITS),
                 .ENABLE(PIPELINE_STAGE_MASK[i])
@@ -136,6 +137,9 @@ module array_divider #(
                 .data_in(input_stage),
                 .data_out(output_stage)
                 );
+            assign Q_out = (o_valid) ? Q_out_calc:'b0;
+            assign R_out = (o_valid) ? R_out_calc:'b0;
+
         end else begin
                       logic [4*DATAWIDTH + 1 + FRAC_BITS-1:0] input_stage, output_stage; 
 
