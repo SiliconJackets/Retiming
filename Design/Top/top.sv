@@ -1,10 +1,10 @@
 module top #(
     parameter DATAWIDTH = 8,
     parameter FRAC_BITS = 8,
-    parameter NUM_PIPELINE_STAGES_MUL = 0,    
-    parameter NUM_PIPELINE_STAGES_DIV = 0,    
-    parameter NUM_PIPELINE_STAGES_SQRT = 0,    
-    parameter NUM_PIPELINE_STAGES_ADDT = 0
+    parameter NUM_PIPELINE_STAGES_MUL = 2,    
+    parameter NUM_PIPELINE_STAGES_DIV = 2,    
+    parameter NUM_PIPELINE_STAGES_SQRT = 2,    
+    parameter NUM_PIPELINE_STAGES_ADDT = 2
 )
 (
     input clk,
@@ -134,6 +134,7 @@ sqrt_int #(
 )
 sqrt_inst (
   .clk(clk),
+  .rst(rst),
   .i_valid(o_valid_adder_tree), 
   .o_valid(o_valid_sqrt),
   .rad(adderTree_out),
@@ -143,13 +144,13 @@ sqrt_inst (
 
 generate
   if (TOTAL_PIPELINE_STAGES == 0) begin
-    assign A_dividend = A;
-    assign B_dividend = B;
-    assign C_dividend = C;
-    assign D_dividend = D;
+      assign A_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, A};
+      assign B_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, B};
+      assign C_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, C};
+      assign D_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, D};
   end else begin
     logic [DATAWIDTH*4-1:0] stage_dividend_data [0:TOTAL_PIPELINE_STAGES-1];
-
+    logic [DATAWIDTH-1:0] A_stage, B_stage, C_stage, D_stage;
     for (genvar s = 0; s < TOTAL_PIPELINE_STAGES; s++) begin : Dividend_pipeline_stage
       logic [4*DATAWIDTH-1:0] input_stage, output_stage;
 
@@ -172,8 +173,12 @@ generate
       assign stage_dividend_data[s] = output_stage;
     end
 
-    // Split final stage output into individual signals
-    assign {A_dividend, B_dividend, C_dividend, D_dividend} = stage_dividend_data[TOTAL_PIPELINE_STAGES-1];
+    assign {A_stage, B_stage, C_stage, D_stage} = stage_dividend_data[TOTAL_PIPELINE_STAGES-1];
+
+    assign A_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, A_stage};
+    assign B_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, B_stage};
+    assign C_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, C_stage};
+    assign D_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, D_stage};
   end
 endgenerate
 

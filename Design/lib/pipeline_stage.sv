@@ -4,10 +4,10 @@ module pipeline_stage #(
    parameter ENABLE = 1
 ) (
  
-   input wire clk,
-   input wire rst,
-   input wire [WIDTH-1:0] data_in,
-   output wire [WIDTH-1:0] data_out
+   input logic clk,
+   input logic rst,
+   input logic [WIDTH-1:0] data_in,
+   output logic [WIDTH-1:0] data_out
  
 );
  

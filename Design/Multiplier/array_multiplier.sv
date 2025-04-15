@@ -47,7 +47,8 @@ module array_multiplier #(
       end
     end
   endgenerate
-
+  
+  assign Z[0][2*DATAWIDTH-1:1] = 'b0;
   assign Z[0][0] = P[0][0*DATAWIDTH + 0]; 
 
   // Generate first HA array 

@@ -34,7 +34,6 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
 top_module = ["sqrt_int"]
 design_paths = [f"{cwd_path}/../Design/SquareRoot/squareroot.sv"]
 '''
-
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
