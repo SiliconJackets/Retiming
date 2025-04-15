@@ -319,6 +319,8 @@ def find_pipeline_stage(module_name, top_module="top", iterations=None):
 def remove_duplicates_keep_lowest_slack(data):
     best = {}
     for entry in data:
+        if entry['startpoint'] == "REGISTER" or entry['endpoint'] == "REGISTER":
+            continue
         sp = entry['startpoint']
         ep = entry['endpoint']
         slack = entry['slack']
@@ -336,7 +338,6 @@ def the_algorithm(condition, telemetry):
     iterations = telemetry["iterations"]
     metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt")
     instance_details = metrics.get_instance_details() 
-
     simplified = remove_duplicates_keep_lowest_slack(instance_details)
 
     # Process Data
@@ -465,7 +466,7 @@ while not flag_stop:
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
-            SYNTH_HIERARCHY_MODE="flatten",
+            SYNTH_HIERARCHY_MODE="deferred_flatten",
             SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
             SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
             SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping

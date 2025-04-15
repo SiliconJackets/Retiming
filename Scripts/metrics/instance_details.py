@@ -10,42 +10,30 @@ class InstanceDetails:
         self.num_enabled_pipeline_stages = None
 
     def pattern_match(self, string, startpoint=True):
-        '''
-        pattern = r'/([^/_]+)_pipeline_stage'
-        match = re.search(pattern, string)
-        if match:
-            module = match.group(1)
-            instance_name = string[:string.find(f"/{module}")]
-            pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
-            match = re.search(pattern, string)
-            pipeline_stage = int(match.group('number'))  
-        '''
-        pattern = r'^(.*?)\.([^.]+)_pipeline_stage\[(\d+)\]' 
+        pattern = r'(.*?)\.([^.]+)_pipeline_stage\[(\d+)\]' 
         match = re.search(pattern, string)
         if match:
             module = match.group(2)
             instance_name = match.group(1)
             pipeline_stage = int(match.group(3))
         else: 
-            #pattern = r'/([^/_]+)_pipeline_stage\[(\d+)\]'
-            pattern = r'^(.*?)/([^.]+)_pipeline_stage\[(\d+)\]' 
+            pattern = r'(.*?)/([^.]+)_pipeline_stage\[(\d+)\]' 
             match = re.search(pattern, string)
             if match:
-                #module = match.group(1)
-                #instance_name = string[:string.find(f"/{module}")]
-                #pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
-                #match = re.search(pattern, string)
-                #pipeline_stage = int(match.group('number'))
                 module = match.group(2)
                 instance_name = match.group(1)
                 pipeline_stage = int(match.group(3))
-            elif startpoint:
+            elif startpoint and string == "INPUT":
                 module = "INPUT"
                 instance_name = "INPUT"
                 pipeline_stage = None
-            else:
+            elif not startpoint and string == "OUTPUT":
                 module = "OUTPUT"
                 instance_name = "OUTPUT"
+                pipeline_stage = None
+            else:
+                module = "REGISTER"
+                instance_name = "REGISTER"
                 pipeline_stage = None
         return module, instance_name, pipeline_stage
     
