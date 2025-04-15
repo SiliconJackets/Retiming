@@ -27,14 +27,18 @@ class InstanceDetails:
             instance_name = match.group(1)
             pipeline_stage = int(match.group(3))
         else: 
-            pattern = r'/([^/_]+)_pipeline_stage\[(\d+)\]'
+            #pattern = r'/([^/_]+)_pipeline_stage\[(\d+)\]'
+            pattern = r'^(.*?)/([^.]+)_pipeline_stage\[(\d+)\]' 
             match = re.search(pattern, string)
             if match:
-                module = match.group(1)
-                instance_name = string[:string.find(f"/{module}")]
-                pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
-                match = re.search(pattern, string)
-                pipeline_stage = int(match.group('number'))
+                #module = match.group(1)
+                #instance_name = string[:string.find(f"/{module}")]
+                #pattern = r'_pipeline_stage\[(?P<number>\d+)\]'
+                #match = re.search(pattern, string)
+                #pipeline_stage = int(match.group('number'))
+                module = match.group(2)
+                instance_name = match.group(1)
+                pipeline_stage = int(match.group(3))
             elif startpoint:
                 module = "INPUT"
                 instance_name = "INPUT"

@@ -9,6 +9,8 @@ import re
 import copy
 import shutil
 import subprocess
+import random 
+
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
@@ -21,21 +23,17 @@ CONFIGURATIONS
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-'''
-top_module = ["top"]
-design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
-                 f"{cwd_path}/../Design/Divider/divider.sv",
-                 f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
-                 f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
-                 f"{cwd_path}/../Design/Top/top.sv"]
-'''
 
 top_module = ["top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
                  f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
-                 f"{cwd_path}/../Design/Top/top.sv"]
+                 f"{cwd_path}/../Design/Top/top.sv"] 
+'''
+top_module = ["sqrt_int"]
+design_paths = [f"{cwd_path}/../Design/SquareRoot/squareroot.sv"]
+'''
 
 ## Library Modules
 lib_modules = ["pipeline_stage"]
@@ -43,7 +41,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 3.0
+clock_period = 2.0
 ## Number of iterations for the algorithm
 N_iterations = 10
 
@@ -106,7 +104,44 @@ def restore_backup_files(backup_file_paths):
             os.remove(backup_path)
 
 
-def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails, pipeline_details: list):
+def shift_pipeline_bit(pipeline_mask, pipeline_stage, left):
+    """
+    Helper function to move the '1' bit from 'from_stage' to 'to_stage' in
+    a pipeline mask string. Assumes leftmost bit = highest stage, rightmost bit = stage 0.
+    Args:
+        pipeline_mask: The pipeline mask string (e.g., "100110")
+        pipeline_stage: The stage to move the '1' bit from (0-indexed)
+        left: Boolean indicating the direction to move the bit.
+            If True, move left (to a higher stage); if False, move right (to a lower stage).
+    Returns:
+        Updated pipeline mask string with the '1' bit moved
+        and a boolean indicating if the operation was successful.
+    """
+    if pipeline_stage is None:
+        return pipeline_mask, False
+
+    bits = list(pipeline_mask)
+    curr_idx = len(bits) - 1 - pipeline_stage
+
+    if left:
+        new_stage = pipeline_stage + 1
+    else:
+        new_stage = pipeline_stage - 1
+        
+    new_idx = len(bits) - 1 - new_stage
+
+    # If either index is out of range, do nothing
+    if not (0 <= curr_idx < len(bits)) or not (0 <= new_idx < len(bits)):
+        return pipeline_mask, False
+    # Move the '1' bit only if current bit is '1' and target bit is '0'
+    if bits[curr_idx] == '1' and bits[new_idx] == '0':
+        bits[curr_idx] = '0'
+        bits[new_idx] = '1'
+        return "".join(bits), True
+    return pipeline_mask, False
+
+
+def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails, pipeline_details: list, telemetry: dict):
     """
     Generate pipeline mask based on the timing path between startpoint and endpoint.
     
@@ -117,42 +152,6 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
     Returns:
         Updated pipeline masks for both startpoint and endpoint instances
     """
-    def shift_pipeline_bit(pipeline_mask, pipeline_stage, left):
-        """
-        Helper function to move the '1' bit from 'from_stage' to 'to_stage' in
-        a pipeline mask string. Assumes leftmost bit = highest stage, rightmost bit = stage 0.
-        Args:
-            pipeline_mask: The pipeline mask string (e.g., "100110")
-            pipeline_stage: The stage to move the '1' bit from (0-indexed)
-            left: Boolean indicating the direction to move the bit.
-                If True, move left (to a higher stage); if False, move right (to a lower stage).
-        Returns:
-            Updated pipeline mask string with the '1' bit moved
-            and a boolean indicating if the operation was successful.
-        """
-        if pipeline_stage is None:
-            return pipeline_mask, False
-
-        bits = list(pipeline_mask)
-        curr_idx = len(bits) - 1 - pipeline_stage
-
-        if left:
-            new_stage = pipeline_stage + 1
-        else:
-            new_stage = pipeline_stage - 1
-            
-        new_idx = len(bits) - 1 - new_stage
-
-        # If either index is out of range, do nothing
-        if not (0 <= curr_idx < len(bits)) or not (0 <= new_idx < len(bits)):
-            return pipeline_mask, False
-        # Move the '1' bit only if current bit is '1' and target bit is '0'
-        if bits[curr_idx] == '1' and bits[new_idx] == '0':
-            bits[curr_idx] = '0'
-            bits[new_idx] = '1'
-            return "".join(bits), True
-        return pipeline_mask, False
-    
     #  INPUT to REGISTER
     if startpoint.module == "INPUT":
         pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
@@ -170,41 +169,68 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
             print("Warning: Unable to shift pipeline bit.")
             return startpoint.pipeline_mask, startpoint.pipeline_stage, None, None
     #  REGISTER to REGISTER
-    startpoint_as_endpoint = None
-    endpoint_as_startpoint = None
-    for pipeline in pipeline_details:
-        if startpoint == pipeline["endpoint"]:
-            startpoint_as_endpoint = pipeline
-        if endpoint == pipeline["startpoint"]:
-            endpoint_as_startpoint = pipeline
-        if startpoint_as_endpoint != None and endpoint_as_startpoint != None:  
-            break
-
-    if startpoint_as_endpoint["slack"] >= endpoint_as_startpoint["slack"]:
-        pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
-        if success:
-            return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
-        else:
-            print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
-            pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
-            if success:
-                return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
-            else:
-                print("Warning: Unable to shift pipeline bit.")
-                return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
-    else:
-        pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
-        if success:
-            return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
-        else:
-            print("Warning: Unable to shift pipeline bit right. Trying to shift left.")
+    if telemetry["kill_count"] > 0:
+        random_bit = random.randint(0, 1)
+        if random_bit == 0:
             pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
             if success:
                 return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
             else:
-                print("Warning: Unable to shift pipeline bit.")
-                return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+                print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
+                pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+                if success:
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+                else:
+                    print("Warning: Unable to shift pipeline bit.")
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+        else:
+            pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+            if success:
+                return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+            else:
+                print("Warning: Unable to shift pipeline bit right. Trying to shift left.")
+                pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+                if success:
+                    return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+                else:
+                    print("Warning: Unable to shift pipeline bit.")
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+    else:
+        startpoint_as_endpoint = None
+        endpoint_as_startpoint = None
+        for pipeline in pipeline_details:
+            if startpoint == pipeline["endpoint"]:
+                startpoint_as_endpoint = pipeline
+            if endpoint == pipeline["startpoint"]:
+                endpoint_as_startpoint = pipeline
+            if startpoint_as_endpoint != None and endpoint_as_startpoint != None:  
+                break
 
+        if startpoint_as_endpoint["slack"] >= endpoint_as_startpoint["slack"]:
+            pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+            if success:
+                return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+            else:
+                print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
+                pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+                if success:
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+                else:
+                    print("Warning: Unable to shift pipeline bit.")
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+        else:
+            pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+            if success:
+                return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+            else:
+                print("Warning: Unable to shift pipeline bit right. Trying to shift left.")
+                pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+                if success:
+                    return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+                else:
+                    print("Warning: Unable to shift pipeline bit.")
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+    
 
 def modify_pipeline_mask(instance_id, custom_mask, file_path):
     """
@@ -268,8 +294,9 @@ def modify_pipeline_mask(instance_id, custom_mask, file_path):
     with open(file_path, 'w') as f:
         f.write(new_content)
 
+
 def find_pipeline_stage(module_name, top_module="top", iterations=None):
-    with open(f"./openlane_run/{2*iterations+1}-yosys-synthesis/raw_netlist.json", 'r') as f:
+    with open(f"./openlane_run/raw_netlist.json", 'r') as f:
         data = json.load(f)
     module_key = data["modules"][top_module]["cells"][module_name]["type"]
     
@@ -290,21 +317,22 @@ def find_pipeline_stage(module_name, top_module="top", iterations=None):
     return len(mask), mask, instance_id, num_pipeline_stages
 
 
+def remove_duplicates_keep_lowest_slack(data):
+    best = {}
+    for entry in data:
+        sp = entry['startpoint']
+        ep = entry['endpoint']
+        slack = entry['slack']
+        key = (sp, ep)
+
+        current_best = best.get(key)
+        if current_best is None or slack < current_best['slack']:
+            best[key] = entry
+
+    return list(best.values())
+
+
 def the_algorithm(condition, telemetry):
-    def remove_duplicates_keep_lowest_slack(data):
-        best = {}
-        for entry in data:
-            sp = entry['startpoint']
-            ep = entry['endpoint']
-            slack = entry['slack']
-            key = (sp, ep)
-
-            current_best = best.get(key)
-            if current_best is None or slack < current_best['slack']:
-                best[key] = entry
-
-        return list(best.values())
-
     # Get Data
     iterations = telemetry["iterations"]
     metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt")
@@ -387,7 +415,7 @@ def the_algorithm(condition, telemetry):
             module_file_location_startpoint = file_finder(data["startpoint"].module, design_paths + lib_paths)
             module_file_location_endpoint = file_finder(data["endpoint"].module, design_paths + lib_paths)
 
-            pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"], simplified)
+            pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"], simplified, temp_telemetry)
 
             print(f"Startpoint File Location: {module_file_location_startpoint}")  
             print(f"Endpoint File Location: {module_file_location_endpoint}")
@@ -411,13 +439,14 @@ SYNTHESIS
 flag_stop = False
 telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
 while not flag_stop:
-    #backup_files = create_backup_files(design_paths)
+    #kilbackup_files = create_backup_files(design_paths)
     for iterations in range(N_iterations):
         print_available_steps()
 
         # Dumping raw netlist
         verilog_str = " ".join(FILES)
-        yosys_cmd = f'mkdir -p ./openlane_run/{2*iterations+1}-yosys-synthesis; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/{2*iterations+1}-yosys-synthesis/raw_netlist.json"'
+        tel_it = telemetry["iterations"]
+        yosys_cmd = f'mkdir -p ./openlane_run/{2*tel_it+1}-yosys-synthesis; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
         # Run Yosys comman
         subprocess.run(yosys_cmd, shell=True, check=True)
         print("Yosys ran successfully!")
@@ -435,7 +464,7 @@ while not flag_stop:
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
-            SYNTH_HIERARCHY_MODE="keep",
+            SYNTH_HIERARCHY_MODE="flatten",
             SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
             SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
             SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping
@@ -470,14 +499,14 @@ while not flag_stop:
             print(telemetry) 
             flag_stop = True
             break
-        input()
+        # input()
     
     if not flag_stop:
         restore_backup_files(backup_files)
         telemetry["attempted_pipeline_combinations"].clear()
         telemetry["kill_count"] = 0
         telemetry["kill"] = False
-        clock_period += 0.1
+        clock_period += 0.2
         input("Press Enter To Continue With Increased Clock Period...")
 
 

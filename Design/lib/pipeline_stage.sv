@@ -12,16 +12,14 @@ module pipeline_stage #(
 );
  
     // Internal register declaration
-    reg [WIDTH-1:0] data_reg;
     generate
        if (ENABLE) begin
            always @(posedge clk) begin
                if (rst)
-                   data_reg <= {WIDTH{1'b0}};
+                   data_out <= {WIDTH{1'b0}};
                else
-                   data_reg <= data_in;
+                   data_out <= data_in;
            end
-            assign data_out = data_reg;
        end else begin
             assign data_out = data_in;
        end

@@ -1,15 +1,13 @@
 module adder_tree_comb #(
-  parameter int WIDTH_IN = 5,   // Bit-width of each input operand
-  parameter int STAGE_ID = 0    
+  parameter WIDTH_IN = 5,   // Bit-width of each input operand
+  parameter STAGE_ID = 0    
 )(
   input  logic [WIDTH_IN-1:0] inA,
   input  logic [WIDTH_IN-1:0] inB,
   output logic [WIDTH_IN:0]   outSum  // outSum is one bit wider than the inputs
 );
 
-  always_comb begin
-    outSum = inA + inB;
-  end
+    assign outSum = inA + inB;
 endmodule
 
 
@@ -25,7 +23,7 @@ module adder_tree #(
   input  logic i_valid,
   input  logic [NUM_INPUTS-1:0][DATAWIDTH-1:0] in_data,
   output logic o_valid,
-  output logic [DATAWIDTH + $clog2(NUM_INPUTS - 1) + 1:0] sum_reg
+  output logic [DATAWIDTH + $clog2(NUM_INPUTS - 1) - 1:0] sum_reg
 );
 
   localparam int NUM_STAGES = $clog2(NUM_INPUTS - 1) + 1;
