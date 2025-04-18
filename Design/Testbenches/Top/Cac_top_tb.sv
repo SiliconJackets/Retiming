@@ -32,7 +32,8 @@ initial begin
 end
 top #(
     .DATAWIDTH(16),
-    .NUM_PIPELINE_STAGES_MUL(1),
+    .FRAC_BITS(8),
+    .NUM_PIPELINE_STAGES_MUL(10),
     .NUM_PIPELINE_STAGES_DIV(0),
     .NUM_PIPELINE_STAGES_SQRT(0),
     .NUM_PIPELINE_STAGES_ADDT(0)
@@ -74,13 +75,13 @@ initial begin
     rst = 1;
     i_valid = 0;
     // Dividend = 24'h040000;
-    #10;
+    @(posedge clk);
     rst = 0;
     A = 16'h0000;
     B = 16'h0000;
     C = 16'h0000;
     D = 16'h0000;
-    #10;
+    @(posedge clk);
     i_valid = 1;
     // Dividend = 24'h040000;
     A = 16'h0100;
@@ -88,26 +89,26 @@ initial begin
     C = 16'h0300;
     D = 16'h0400;
 
-    #10;
+    @(posedge clk);
     A = 16'h0100;
     B = 16'h0100;
     C = 16'h0100;
     D = 16'h0100;
     
-    #10;
+    @(posedge clk);
     A = 16'h0100;
     B = 16'h0500;
     C = 16'h0500;
     D = 16'h0800;
 
-    #10;
+    @(posedge clk);
 
     A = 16'h0100;
     B = 16'h0200;
     C = 16'h0300;
     D = 16'h0400;
 
-    #10;
+    @(posedge clk);
     A = 16'h1100;
     B = 16'h1500;
     C = 16'h2500;
@@ -115,14 +116,22 @@ initial begin
     
     // i_valid = 0;
 
-    #10;
+    @(posedge clk);
 
     A = 16'h0100;
     B = 16'h0200;
     C = 16'h0300;
     D = 16'h0400;
 
-    #10;
+    // Fractional numbers
+    @(posedge clk);
+
+    A = 16'h0180;
+    B = 16'h0240;
+    C = 16'h0320;
+    D = 16'h0410;
+
+    @(posedge clk);
 
     i_valid = 0;
 
@@ -131,7 +140,7 @@ initial begin
     C = 16'h0000;
     D = 16'h0000;
 
-    #100;
+    repeat (30) @(posedge clk);
     $finish;
 end
 
