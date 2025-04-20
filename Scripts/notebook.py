@@ -40,7 +40,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 50
+clock_period = 85.0  # Working Clock Period
 ## Number of iterations for the algorithm
 N_iterations = 1
 
@@ -514,7 +514,7 @@ while not flag_stop:
         print("============================================================")
         print("Increasing clock by 2.5")
         print("============================================================")
-        input("Press Enter To Continue With Increased Clock Period...")
+        #input("Press Enter To Continue With Increased Clock Period...")
 
 
 
