@@ -14,7 +14,6 @@ module top #(
     input logic [DATAWIDTH-1:0] B, //Input: fixed-point 8.8 format 
     input logic [DATAWIDTH-1:0] C, //Input: fixed-point 8.8 format
     input logic [DATAWIDTH-1:0] D, //Input: fixed-point 8.8 format
-    // input logic [DATAWIDTH-1+8:0] Dividend, //Input: fixed-point 8.16 format
     output logic o_valid_final_A,
     output logic o_valid_final_B,
     output logic o_valid_final_C,
@@ -124,8 +123,6 @@ adder_tree0 (
   .o_valid(o_valid_adder_tree),
   .sum_reg(adderTree_out)
   );
-
-
 
 sqrt_int #(
   .DATAWIDTH(DATAWIDTH*2 + 2),

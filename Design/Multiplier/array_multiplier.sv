@@ -10,7 +10,7 @@ endmodule
 
 module array_multiplier #(
   parameter DATAWIDTH = 4,
-  parameter NUM_PIPELINE_STAGES = 1,           // For now, have stages refer to pp sums (seventh row is reg out)
+  parameter NUM_PIPELINE_STAGES = 1,  
   parameter INSTANCE_ID = 0 
 )(
   input logic clk,
@@ -26,11 +26,10 @@ module array_multiplier #(
   localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
   logic [DATAWIDTH-1:0] A_reg, B_reg,A_reg_wire, B_reg_wire;
 
-  // Figure out a way to reduce this for now keeping this as is 
-  logic [DATAWIDTH*DATAWIDTH-1:0] P [DATAWIDTH:0];  // Two pipeline stages
+  logic [DATAWIDTH*DATAWIDTH-1:0] P [DATAWIDTH:0];
   logic [DATAWIDTH-2:0] C [2*DATAWIDTH-2:0];
   logic [DATAWIDTH-3:0] S [2*DATAWIDTH-3:0];
-  logic [2*DATAWIDTH-1:0] Z [2*DATAWIDTH:0];// [2*DATAWIDTH]
+  logic [2*DATAWIDTH-1:0] Z [2*DATAWIDTH:0];
   logic valid [STAGE_MASK_WIDTH-1];
 
   genvar i, j;
@@ -202,8 +201,8 @@ module array_multiplier #(
           .data_in(input_stage),
           .data_out(output_stage) 
         );  
-      end
-         
+      end    
     end
   endgenerate
+  
 endmodule

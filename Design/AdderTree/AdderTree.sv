@@ -1,20 +1,18 @@
 module adder_tree_comb #(
-  parameter WIDTH_IN = 5,   // Bit-width of each input operand
+  parameter WIDTH_IN = 5,
   parameter STAGE_ID = 0    
 )(
   input  logic [WIDTH_IN-1:0] inA,
   input  logic [WIDTH_IN-1:0] inB,
-  output logic [WIDTH_IN:0]   outSum  // outSum is one bit wider than the inputs
+  output logic [WIDTH_IN:0]   outSum
 );
 
-    assign outSum = inA + inB;
+  assign outSum = inA + inB;
 endmodule
-
-
 
 module adder_tree #(
   parameter DATAWIDTH  = 4,
-  parameter NUM_INPUTS = 16, // Maximum is 32
+  parameter NUM_INPUTS = 16,
   parameter NUM_PIPELINE_STAGES = 1,
   parameter INSTANCE_ID = 0
 )(
@@ -35,7 +33,6 @@ module adder_tree #(
   
   logic valid_r [0:NUM_STAGES];
 
-
   // Generate pipeline stages
   generate
     for (genvar s = 0; s < STAGE_MASK_WIDTH; s++) begin : AdderTree_pipeline_stage
@@ -51,7 +48,6 @@ module adder_tree #(
             assign bundle_in[i*OUT_W +: OUT_W] = in_data[i];
             assign stage_data[0][i] = bundle_out[i*OUT_W +: OUT_W];
           end
-
 
           assign input_stage = {bundle_in, i_valid};
           assign {bundle_out, valid_r[0]} = output_stage;
@@ -82,9 +78,7 @@ module adder_tree #(
         );
       end else begin
         localparam int OUT_W = DATAWIDTH + s;
-        // localparam int CUR_INPUTS = (NUM_INPUTS >> (s - 1));
         localparam int CUR_INPUTS = ((NUM_INPUTS + (1 << (s-1)) - 1) >> (s-1));
-
         localparam int NUM_NEXT = (CUR_INPUTS + 1) / 2;
 
         logic [NUM_NEXT*OUT_W-1:0] bundle_in;
@@ -107,7 +101,6 @@ module adder_tree #(
     end
   endgenerate
 
-
   // Generate combinational adder stages
   generate
     for (genvar s = 0; s < NUM_STAGES; s++) begin : AdderTree_comb_stage
@@ -129,6 +122,5 @@ module adder_tree #(
         end
     end
   endgenerate
-
 
 endmodule
