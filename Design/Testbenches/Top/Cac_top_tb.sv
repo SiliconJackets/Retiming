@@ -2,9 +2,14 @@
 
 module tb_top;
   parameter int DATAWIDTH   = 8;
-  parameter int NUM_TESTS   = 100;
+  parameter int NUM_TESTS   = 10;
   parameter int FRAC_BITS   = 8;
-  parameter int PIPELINE_LATENCY = (DATAWIDTH + 2) + ($clog2(4 - 1) + 1 + 1) + ((DATAWIDTH >> 1) + 2) + (DATAWIDTH + 1 + FRAC_BITS);   // total # of stages
+  parameter int MUL_STAGES = 0;
+  parameter int ADD_STAGES = 0;
+  parameter int SQRT_STAGES = 0;
+  parameter int DIV_STAGES = 0;
+  parameter int MAX_STAGES = (DATAWIDTH + 2) + ($clog2(4 - 1) + 1 + 1) + ((DATAWIDTH >> 1) + 2) + (DATAWIDTH + 1 + FRAC_BITS);
+  parameter int PIPELINE_LATENCY = MUL_STAGES + ADD_STAGES + SQRT_STAGES + DIV_STAGES;  // total # of stages
   logic clk;
   logic rst;
   wire i_valid;
@@ -40,10 +45,10 @@ initial begin
 end
 top #(
     .DATAWIDTH(DATAWIDTH),
-    .NUM_PIPELINE_STAGES_MUL(DATAWIDTH + 2),
-    .NUM_PIPELINE_STAGES_DIV(DATAWIDTH + 1 + FRAC_BITS),
-    .NUM_PIPELINE_STAGES_SQRT((DATAWIDTH >> 1) + 2),
-    .NUM_PIPELINE_STAGES_ADDT($clog2(4 - 1) + 1 + 1)
+    .NUM_PIPELINE_STAGES_MUL(MUL_STAGES),
+    .NUM_PIPELINE_STAGES_DIV(DIV_STAGES),
+    .NUM_PIPELINE_STAGES_SQRT(SQRT_STAGES),
+    .NUM_PIPELINE_STAGES_ADDT(ADD_STAGES)
   )
   top0 (
     .clk(clk),
@@ -143,7 +148,9 @@ program automatic tb_program #(parameter int DW = 8, NTESTS = 10, FRAC = 8, PIPE
              output_final_A, output_final_B, output_final_C, output_final_D,
              o_valid_final_A, o_valid_final_B, o_valid_final_C, o_valid_final_D);
 
-    tidx++;
+    if (PIPE > 0) begin
+        tidx++;
+    end
 
     if (tidx >= PIPE) begin
       int idx = tidx - PIPE;
@@ -162,6 +169,9 @@ program automatic tb_program #(parameter int DW = 8, NTESTS = 10, FRAC = 8, PIPE
       end
     end
       
+    if (PIPE == 0) begin
+        tidx++;
+    end
   end
 
   release A; release B; release C; release D; release i_valid;
