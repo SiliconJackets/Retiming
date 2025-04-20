@@ -23,7 +23,7 @@ CONFIGURATIONS
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-'''
+
 top_module = ["top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
@@ -33,16 +33,16 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
 '''
 top_module = ["array_multiplier_top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
-
+'''
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 2.0
+clock_period = 50
 ## Number of iterations for the algorithm
-N_iterations = 50
+N_iterations = 1
 
 FILES = [path for path in design_paths + lib_paths if path]
 ## No changes bellow this line ###
@@ -438,8 +438,8 @@ SYNTHESIS
 '''
 flag_stop = False
 telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":False, "iterations":0}
+backup_files = create_backup_files(design_paths)
 while not flag_stop:
-    backup_files = create_backup_files(design_paths)
     for iterations in range(N_iterations):
         print_available_steps()
 
@@ -483,8 +483,8 @@ while not flag_stop:
         sta_pre_pnr.start()
 
         # Parse Timing Data.
-        iterations = telemetry["iterations"]
-        stateout = StateOutMetrics(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/state_out.json")
+        it = telemetry["iterations"]
+        stateout = StateOutMetrics(f"./openlane_run/{2*it+2}-openroad-staprepnr/state_out.json")
         if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
             print("Timing Violated For nom_ss_100C_1v60")
             temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
@@ -502,15 +502,15 @@ while not flag_stop:
         print("============================================================")
         print("One Iteration Completed")
         print("============================================================")
-        input()
+        # input()
     
     if not flag_stop:
-        #restore_backup_files(backup_files)
+        # restore_backup_files(backup_files)  # we get a good enough solution and base it on that first.
         telemetry = temp_telemetry
         telemetry["attempted_pipeline_combinations"].clear()
         telemetry["kill_count"] = 0
         telemetry["kill"] = False
-        clock_period += 1
+        clock_period += 2.5
         print("============================================================")
         print("Increasing clock by 2.5")
         print("============================================================")
