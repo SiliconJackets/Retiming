@@ -1,14 +1,9 @@
-/*
-Credit to https://projectf.io/posts/square-root-in-verilog/ for algorithm
-
-Unsigned Square Root with Pipeline Support
-*/
 module sqrt_stage #(
     parameter DATAWIDTH = 8
 )(
-    input  logic [DATAWIDTH+1:0] ac,      // Accumulator
-    input  logic [DATAWIDTH-1:0] x,       // Remaining radicand
-    input  logic [DATAWIDTH-1:0] q,       // Intermediate root
+    input  logic [DATAWIDTH+1:0] ac,      
+    input  logic [DATAWIDTH-1:0] x,       
+    input  logic [DATAWIDTH-1:0] q,       
     output logic [DATAWIDTH+1:0] ac_next, 
     output logic [DATAWIDTH-1:0] x_next,  
     output logic [DATAWIDTH-1:0] q_next   
@@ -17,7 +12,7 @@ module sqrt_stage #(
     
     always_comb begin
         test_res = ac - {q, 2'b01};
-        if (test_res[DATAWIDTH+1] == 0) begin  // If test_res >= 0
+        if (test_res[DATAWIDTH+1] == 0) begin
             {ac_next, x_next} = {test_res[DATAWIDTH-1:0], x, 2'b0};
             q_next = {q[DATAWIDTH-2:0], 1'b1};
         end else begin
@@ -41,9 +36,9 @@ module sqrt_int #(
     output      logic [DATAWIDTH-1:0] root,
     output      logic [DATAWIDTH-1:0] rem
 );
-    localparam ITERATIONS = DATAWIDTH >> 1;   // Always complete in N/2 ITERATIONS (not cycles necessarily)
+    localparam ITERATIONS = DATAWIDTH >> 1;
 
-    localparam STAGE_MASK_WIDTH = ITERATIONS + 2;     // N/2 ITERATIONS + reg in + reg out
+    localparam STAGE_MASK_WIDTH = ITERATIONS + 2;
     localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
     
     // Register arrays for pipeline stages
@@ -59,7 +54,6 @@ module sqrt_int #(
 
     genvar i, j;
 
-    // Expand
     logic valid [STAGE_MASK_WIDTH-1:0];
 
     assign {ac[0], x[0]} = (valid[0]) ? {{DATAWIDTH{1'b0}}, rad_reg, 2'b0} : '0;
@@ -85,10 +79,8 @@ module sqrt_int #(
     generate
         for (i = 0; i < STAGE_MASK_WIDTH; i = i + 1) begin : sqrt_pipeline_stage
             
-            // Whether we want to register the inputs
             if (i == 0) begin
 
-                // rad is DATAWIDTH, valid is 1 bit, so need DATAWIDTH - 1 + 1 bits
                 logic [DATAWIDTH:0] input_stage, output_stage;
 
                 assign input_stage = {rad, i_valid};
@@ -105,13 +97,10 @@ module sqrt_int #(
                     .data_out(output_stage)
                 );
 
-            // Whether we want to register the outputs
             end else if (i == STAGE_MASK_WIDTH - 1) begin
 
-                // root and rem are DATAWIDTH, valid is 1 bit, so need 2*DATAWIDTH - 1 + 1 bits
                 logic [2*DATAWIDTH:0] input_stage, output_stage;
 
-                // Undo the final shift
                 assign input_stage = {q[ITERATIONS], ac[ITERATIONS][DATAWIDTH+1:2], valid[i-1]};
                 assign {root, rem, o_valid} = output_stage;
 
@@ -128,7 +117,6 @@ module sqrt_int #(
             
             end else begin
                 
-                // Need to pass ac, x, q, and valid
                 logic [3*DATAWIDTH + 2:0] input_stage, output_stage;
 
                 assign input_stage = {x_stage[i], q_stage[i], ac_stage[i], valid[i-1]};
