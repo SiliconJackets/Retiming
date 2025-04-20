@@ -9,33 +9,24 @@ class InstanceDetails:
         self.instance_id = None
         self.num_enabled_pipeline_stages = None
 
-    def pattern_match(self, string, startpoint=True):
-        pattern = r'(.*?)\.([^.]+)_pipeline_stage\[(\d+)\]' 
-        match = re.search(pattern, string)
-        if match:
-            module = match.group(2)
-            instance_name = match.group(1)
-            pipeline_stage = int(match.group(3))
-        else: 
-            pattern = r'(.*?)/([^.]+)_pipeline_stage\[(\d+)\]' 
+    def pattern_match(self, string, startpoint=False):
+        patterns = [
+            r'(.*?)\.([^.]+)_pipeline_stage\[(\d+)\]',
+            r'(.*?)/([^.]+)_pipeline_stage\[(\d+)\]'
+        ]
+
+        for pattern in patterns:
             match = re.search(pattern, string)
             if match:
-                module = match.group(2)
-                instance_name = match.group(1)
-                pipeline_stage = int(match.group(3))
-            elif startpoint and string == "INPUT":
-                module = "INPUT"
-                instance_name = "INPUT"
-                pipeline_stage = None
-            elif not startpoint and string == "OUTPUT":
-                module = "OUTPUT"
-                instance_name = "OUTPUT"
-                pipeline_stage = None
-            else:
-                module = "REGISTER"
-                instance_name = "REGISTER"
-                pipeline_stage = None
-        return module, instance_name, pipeline_stage
+                instance_name, module, stage = match.groups()
+                return module, instance_name, int(stage)
+
+        if startpoint and string == "INPUT":
+            return "INPUT", "INPUT", None
+        elif not startpoint and string == "OUTPUT":
+            return "OUTPUT", "OUTPUT", None
+        else:
+            return "REGISTER", "REGISTER", None
     
     def __repr__(self):
         return f"""InstanceDetails(module={self.module}, instance_name={self.instance_name}, instance_id={self.instance_id}, num_pipeline_stages={self.num_pipeline_stages}, pipeline_stage={self.pipeline_stage}, pipeline_mask={self.pipeline_mask}, num_enabled_pipeline_stages={self.num_enabled_pipeline_stages})"""

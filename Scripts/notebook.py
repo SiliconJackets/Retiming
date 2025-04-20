@@ -23,7 +23,7 @@ CONFIGURATIONS
 ### Make Changes here ###
 cwd_path = os.getcwd()
 ## Design Modules
-
+'''
 top_module = ["top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
@@ -31,9 +31,9 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
                  f"{cwd_path}/../Design/Top/top.sv"] 
 '''
-top_module = ["array_multiplier"]
+top_module = ["array_multiplier_top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
-'''
+
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
@@ -42,7 +42,7 @@ clock_pin = "clk"
 ## Clock period
 clock_period = 2.0
 ## Number of iterations for the algorithm
-N_iterations = 1
+N_iterations = 50
 
 FILES = [path for path in design_paths + lib_paths if path]
 ## No changes bellow this line ###
@@ -446,7 +446,7 @@ while not flag_stop:
         # Dumping raw netlist
         verilog_str = " ".join(FILES)
         tel_it = telemetry["iterations"]
-        yosys_cmd = f'mkdir -p ./openlane_run/{2*tel_it+1}-yosys-synthesis; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
+        yosys_cmd = f'rm -rf ./openlane_run/*yosys* ./openlane_run/*openroad*; mkdir -p ./openlane_run; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
         # Run Yosys comman
         subprocess.run(yosys_cmd, shell=True, check=True)
         print("Yosys ran successfully!")
@@ -465,9 +465,9 @@ while not flag_stop:
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
             SYNTH_HIERARCHY_MODE="deferred_flatten",
-            SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
             SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
             SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping
+            SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
             SYNTH_ABC_BUFFERING=True,            # Enable cell buffering
             state_in=State(),
         )
@@ -499,14 +499,21 @@ while not flag_stop:
             print(telemetry) 
             flag_stop = True
             break
-        # input()
+        print("============================================================")
+        print("One Iteration Completed")
+        print("============================================================")
+        input()
     
     if not flag_stop:
-        restore_backup_files(backup_files)
+        #restore_backup_files(backup_files)
+        telemetry = temp_telemetry
         telemetry["attempted_pipeline_combinations"].clear()
         telemetry["kill_count"] = 0
         telemetry["kill"] = False
-        clock_period += 0.2
+        clock_period += 1
+        print("============================================================")
+        print("Increasing clock by 2.5")
+        print("============================================================")
         input("Press Enter To Continue With Increased Clock Period...")
 
 
