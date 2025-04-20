@@ -31,8 +31,8 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
                  f"{cwd_path}/../Design/Top/top.sv"] 
 '''
-top_module = ["sqrt_int"]
-design_paths = [f"{cwd_path}/../Design/SquareRoot/squareroot.sv"]
+top_module = ["array_multiplier"]
+design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
 '''
 ## Library Modules
 lib_modules = ["pipeline_stage"]
@@ -42,7 +42,7 @@ clock_pin = "clk"
 ## Clock period
 clock_period = 2.0
 ## Number of iterations for the algorithm
-N_iterations = 10
+N_iterations = 1
 
 FILES = [path for path in design_paths + lib_paths if path]
 ## No changes bellow this line ###
@@ -319,7 +319,7 @@ def find_pipeline_stage(module_name, top_module="top", iterations=None):
 def remove_duplicates_keep_lowest_slack(data):
     best = {}
     for entry in data:
-        if entry['startpoint'] == "REGISTER" or entry['endpoint'] == "REGISTER":
+        if entry['startpoint'].module == "REGISTER" or entry['endpoint'].module == "REGISTER":
             continue
         sp = entry['startpoint']
         ep = entry['endpoint']
@@ -342,8 +342,6 @@ def the_algorithm(condition, telemetry):
 
     # Process Data
     for i, details in enumerate(simplified):
-        print(details["startpoint"])
-        print(details["endpoint"])
         if details["startpoint"].module != "INPUT":
             details["startpoint"].num_pipeline_stages, details["startpoint"].pipeline_mask, details["startpoint"].instance_id, details["startpoint"].num_enabled_pipeline_stages = find_pipeline_stage(details["startpoint"].instance_name, top_module[0], iterations)
 

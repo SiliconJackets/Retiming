@@ -2,3 +2,4 @@ Scripts/.env
 Scripts/openlane_run
 Design/Testbenches/WORKSPACE
 __pycache__
+*_backup.sv
