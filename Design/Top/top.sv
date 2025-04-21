@@ -118,7 +118,7 @@ adder_tree #(
 adder_tree0 (
   .clk(clk),
   .rst(rst),
-  .i_valid(o_valid_A_mul),
+  .i_valid(o_valid_A_mul&o_valid_B_mul&o_valid_C_mul&o_valid_D_mul),
   .in_data(adder_in_data), 
   .o_valid(o_valid_adder_tree),
   .sum_reg(adderTree_out)

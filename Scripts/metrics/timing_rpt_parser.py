@@ -3,7 +3,7 @@ from metrics import InstanceDetails
 
 
 class TimingRptParser:
-    def __init__(self, timing_rpt: str = None):
+    def __init__(self, timing_rpt: list[str] = None):
         """
         Initialize the parser with the contents of a max report file.
         :param timing_rpt: The .rpt file.
@@ -11,8 +11,10 @@ class TimingRptParser:
         if timing_rpt is None:
             raise ValueError("No timing report file provided.")
         else:
-            with open(timing_rpt, 'r') as f:
-                self.timing_rpt = f.read()
+            self.timing_rpt = "" 
+            for rpt_file in timing_rpt: 
+                with open(rpt_file, 'r') as f:
+                    self.timing_rpt += f.read() + "\n"
         self.paths = []  # List to store parsed path information
 
         self.parse()
