@@ -4,6 +4,7 @@ module squareroot_tb;
 
     parameter CLK_PERIOD = 10;
     parameter DATAWIDTH = 8;
+    parameter NUM_PIPELINE_STAGES = 2;
 
     logic clk;
     logic rst;
@@ -13,7 +14,7 @@ module squareroot_tb;
     logic [DATAWIDTH-1:0] root;  // root
     logic [DATAWIDTH-1:0] rem;   // remainder
 
-    sqrt_int #(.DATAWIDTH(DATAWIDTH)) sqrt_inst (.*);
+    sqrt_int #(.DATAWIDTH(DATAWIDTH), .NUM_PIPELINE_STAGES(NUM_PIPELINE_STAGES)) sqrt_inst (.*);
 
     always #(CLK_PERIOD / 2) clk = ~clk;
 
@@ -35,17 +36,18 @@ module squareroot_tb;
                 i_valid = '0;
                 rad = '0;
 
-        #10     rst = 0;
+        @(posedge clk)     rst = 0;
 
         // Pipeline test
-        #50     rad = 8'h01;    // 1
+        @(posedge clk);     
+                rad = 8'h01;    // 1
                 i_valid = 1;
-        #10     rad = 8'h04;    // 4
-        #10     rad = 8'h09;    // 9
-        #10     rad = 8'h0F;    // 15
-        #10     rad = 8'hF0;    // 240
-        #10     rad = 8'hFF;    // 255
-        #10     i_valid = 0;
+        @(posedge clk)     rad = 8'h04;    // 4
+        @(posedge clk)     rad = 8'h09;    // 9
+        @(posedge clk)     rad = 8'h0F;    // 15
+        @(posedge clk)     rad = 8'hF0;    // 240
+        @(posedge clk)     rad = 8'hFF;    // 255
+        @(posedge clk)     i_valid = 0;
 
         #1000     $finish;
         

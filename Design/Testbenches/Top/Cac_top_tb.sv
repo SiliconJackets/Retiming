@@ -4,12 +4,13 @@ module tb_top;
   parameter int DATAWIDTH   = 8;
   parameter int NUM_TESTS   = 10;
   parameter int FRAC_BITS   = 8;
-  parameter int MUL_STAGES = 0;
-  parameter int ADD_STAGES = 0;
-  parameter int SQRT_STAGES = 0;
-  parameter int DIV_STAGES = 0;
-  parameter int MAX_STAGES = (DATAWIDTH + 2) + ($clog2(4 - 1) + 1 + 1) + ((DATAWIDTH >> 1) + 2) + (DATAWIDTH + 1 + FRAC_BITS);
-  parameter int PIPELINE_LATENCY = MUL_STAGES + ADD_STAGES + SQRT_STAGES + DIV_STAGES;  // total # of stages
+  parameter int ENABLE_MAX = 1;
+  parameter int MUL_STAGES = ENABLE_MAX ? (DATAWIDTH + 2) : 0;
+  parameter int ADD_STAGES = ENABLE_MAX ? ($clog2(4 - 1) + 1) : 0;
+  parameter int SQRT_STAGES = ENABLE_MAX ? ((DATAWIDTH >> 1) + 1) : 0;
+  parameter int DIV_STAGES = ENABLE_MAX ? (DATAWIDTH + 1 + FRAC_BITS) : 0;
+  parameter int MAX_STAGES = (DATAWIDTH + 2) + ($clog2(4 - 1) + 1) + ((DATAWIDTH >> 1) + 1) + (DATAWIDTH + 1 + FRAC_BITS);
+  parameter int PIPELINE_LATENCY = ENABLE_MAX ? MAX_STAGES : MUL_STAGES + ADD_STAGES + SQRT_STAGES + DIV_STAGES;  // total # of stages
   logic clk;
   logic rst;
   wire i_valid;
