@@ -4,8 +4,8 @@
 module tb_add_subtractor_pl;
 
   // Parameters (configure as needed)
-  parameter int DATAWIDTH           = 8;
-  parameter int NUM_PIPELINE_STAGES = 4; // Match DUT parameter
+  parameter int DATAWIDTH           = 4;
+  parameter int NUM_PIPELINE_STAGES = 5; // Match DUT parameter
   parameter int NUM_TESTS           = 30; // Number of random tests
 
   // Calculate latency based on DUT stages
@@ -33,7 +33,7 @@ module tb_add_subtractor_pl;
   // Reset generation: Assert reset for 20ns at the beginning
   initial begin
     rst = 1;
-    #20;
+    #15;
     rst = 0;
   end
 
@@ -180,15 +180,13 @@ program automatic tb_program #(
       // Wait for the next positive clock edge
       @(posedge clk);
       cycle++;
+      test_idx++;
 
-      // Display Current State (optional, can be verbose)
-      // $display("Time=%0t | Cycle=%0d | i_valid=%b | A=%d B=%d op=%b | Result=%d o_valid=%b Overflow=%b",
-      //          $time, cycle, i_valid, A, B, op, Result, o_valid, Overflow);
 
       // Check outputs after pipeline latency
-      if (test_idx >= PIPE-1) begin
-        int check_idx = test_idx - PIPE + 1; // Index of the test vector expected at the output
-
+      if (test_idx >= PIPE) begin
+        int check_idx = (PIPE == 0)? test_idx-1:test_idx - PIPE ; // Index of the test vector expected at the output
+      
         if (o_valid) begin
             logic check_passed = 1'b1;
             logic [DW-1:0] current_expected_result = tests[check_idx].expected_Result;
@@ -197,15 +195,6 @@ program automatic tb_program #(
 
             // Basic Result Check
             if (Result !== current_expected_result) begin
-                //  // Check if the mismatch is due to the DUT's specific overflow saturation
-                //  if (Overflow && current_op == 0 && Result === {DW{1'b1}}) begin
-                //     // DUT saturated to all 1s on ADD overflow, accept this if DUT signaled Overflow
-                //     $display("Cycle=%0d | INFO: Test %0d (%s) - Result saturated to %d on detected overflow. Expected=%d.", cycle, check_idx, op_str, Result, current_expected_result);
-                //  end else if (Overflow && current_op == 1 && Result === {DW{1'b0}}) begin
-                //     // DUT saturated to all 0s on SUB overflow (based on DUT code example), accept this if DUT signaled Overflow
-                //     // Note: The DUT overflow check is only for op=0, so this condition might not be met exactly as written in DUT
-                //      $display("Cycle=%0d | INFO: Test %0d (%s) - Result saturated to %d on detected overflow. Expected=%d.", cycle, check_idx, op_str, Result, current_expected_result);
-                //  end else begin
                     // Genuine mismatch
                     $display("Cycle=%0d | FAIL: Test %0d (%s)", cycle, check_idx, op_str);
                     $display("       Inputs for current result: A=%d, B=%d", tests[check_idx].A, tests[check_idx].B);
@@ -215,21 +204,10 @@ program automatic tb_program #(
                 //  end
             end
 
-            // Optional: Check if DUT's overflow flag matches mathematical overflow/borrow
-            // Note: This check might fail if the DUT implements signed overflow and we calculated unsigned,
-            // or if the DUT's overflow logic differs significantly.
-            // if (check_passed && Overflow !== tests[check_idx].expected_oflow) begin
-            //      $display("Time=%0t | WARN: Test %0d (%s) - Overflow flag mismatch.", $time, check_idx, op_str);
-            //      $display("       Inputs: A=%d, B=%d", tests[check_idx].A, tests[check_idx].B);
-            //      $display("       Expected Math Oflo/Borrow: %b", tests[check_idx].expected_oflow);
-            //      $display("       Got DUT Overflow Flag:     %b", Overflow);
-            //      // Decide if this constitutes a failure based on requirements
-            // end
 
             // Report Pass
             if (check_passed) begin
-                // $display("Time=%0t | PASS: Test %0d (%s) - Result: %d (DUT Overflow: %b)", $time, check_idx, op_str, Result, Overflow);
-                $display("Time=%0t | PASS: Test %0d (%s)", $time, check_idx, op_str);
+                $display("Cycle=%0d | PASS: Test (%s)", cycle, op_str);
                 pass_count++;
             end else begin
                 fail_count++;
@@ -244,7 +222,9 @@ program automatic tb_program #(
       end // End of checking block
 
       // Increment test index for the next cycle
-      test_idx++;
+      // test_idx++;
+      // cycle++;
+      
 
     end // End of while loop
 

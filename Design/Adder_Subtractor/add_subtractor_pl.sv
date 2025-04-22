@@ -19,22 +19,22 @@ module AdderSubtractorPipelined #(
     output wire carry_borrow
 );
 
-    localparam STAGE_WIDTH = DATAWIDTH / NUM_PIPELINE_STAGES;
+    localparam STAGE_WIDTH = 1;
     localparam STAGE_MASK_WIDTH = DATAWIDTH + 1;
 
-    localparam [STAGE_MASK_WIDTH-1:0] PIPELINE_STAGE_MASK = {STAGE_MASK_WIDTH{1'b1}};
-
-    wire [DATAWIDTH-1:0] A_stage [0:NUM_PIPELINE_STAGES-1];
-    wire [DATAWIDTH-1:0] B_stage [0:NUM_PIPELINE_STAGES-1];
-    logic [DATAWIDTH-1:0] Sum_stage [0:NUM_PIPELINE_STAGES-1];
-    wire valid [0:NUM_PIPELINE_STAGES-1];
-    wire carry_stage [0:NUM_PIPELINE_STAGES];
-    wire op_pipe [0:NUM_PIPELINE_STAGES-1];
+    localparam [STAGE_MASK_WIDTH-1:0] PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}};
+  
+    wire [DATAWIDTH-1:0] A_stage [0:DATAWIDTH-1];
+    wire [DATAWIDTH-1:0] B_stage [0:DATAWIDTH-1];
+    logic [DATAWIDTH-1:0] Sum_stage [0:DATAWIDTH-1];
+    wire valid [0:DATAWIDTH-1];
+    wire carry_stage [0:DATAWIDTH];
+    wire op_pipe [0:DATAWIDTH-1];
     assign carry_stage[0] = op;
 
     genvar i;
     generate
-        for (i = 0; i < NUM_PIPELINE_STAGES; i = i + 1) begin : pipeline_stages
+        for (i = 0; i < DATAWIDTH; i = i + 1) begin : pipeline_stages
             logic [3*DATAWIDTH+2:0] input_stage, output_stage;
             logic [DATAWIDTH-1:0] sum0;
             logic [STAGE_WIDTH:0] carry_internal;
@@ -58,40 +58,46 @@ module AdderSubtractorPipelined #(
                 .data_out(output_stage)
             );
 
-            // wire [STAGE_WIDTH:0] carry_internal;
-            // assign carry_internal[0] = carry_stage[i];
 
-            genvar b;
-            for (b = 0; b < STAGE_WIDTH; b = b + 1) begin : bit_loop
-                localparam IDX = i * STAGE_WIDTH + b;
 
-                wire a_bit = A_stage[i][IDX];
-                wire b_bit = B_stage[i][IDX];
-                wire cin   = carry_internal[b];
 
-                logic sum, cout;
-                full_adder fa (
-                    .a(a_bit),
-                    .b(b_bit),
-                    .cin(cin),
-                    .s(sum),
-                    .c(cout)
-                );
+            wire a_bit = A_stage[i][i];
+            wire b_bit = B_stage[i][i];
+            wire cin   = carry_internal[0];
 
-                assign Sum_stage[i][IDX] = sum;
-                assign carry_internal[b+1] = cout;
-            end
-            assign Sum_stage[i][i * STAGE_WIDTH-1:0] = sum0[i * STAGE_WIDTH-1:0];
-            assign carry_stage[i+1] = carry_internal[STAGE_WIDTH];
+            logic sum, cout;
+            full_adder fa (
+                .a(a_bit),
+                .b(b_bit),
+                .cin(cin),
+                .s(sum),
+                .c(cout)
+            );
+
+            assign Sum_stage[i][i] = sum;
+            assign carry_internal[1] = cout;
+            assign Sum_stage[i][i-1:0] = sum0[i:0];
+            assign carry_stage[i+1] = carry_internal[1];
         end
     endgenerate
 
-    wire [DATAWIDTH-1:0] SumFinal = Sum_stage[NUM_PIPELINE_STAGES-1];
-    wire actual_carry_out = carry_stage[NUM_PIPELINE_STAGES];
-    wire carry_into_last  = carry_stage[NUM_PIPELINE_STAGES - 1];
+    logic [DATAWIDTH+1:0] input_stage1, output_stage1;
+    logic [DATAWIDTH-1:0] SumFinal;
+    logic actual_carry_out;
+    assign input_stage1 = {Sum_stage[DATAWIDTH-1], carry_stage[DATAWIDTH], valid[DATAWIDTH-1]};
+    assign {SumFinal, actual_carry_out, o_valid} = output_stage1;
+
+    pipeline_stage #(
+        .WIDTH($bits(input_stage1)),
+        .ENABLE(PIPELINE_STAGE_MASK[DATAWIDTH])
+    ) pipe_reg1 (
+        .clk(clk),
+        .rst(rst),
+        .data_in(input_stage1),
+        .data_out(output_stage1)
+    );
 
     assign Result = SumFinal;
     assign carry_borrow = actual_carry_out;
 
-    assign o_valid = valid[NUM_PIPELINE_STAGES-1];
 endmodule
