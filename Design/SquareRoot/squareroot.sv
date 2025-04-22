@@ -42,19 +42,19 @@ module sqrt_int #(
     localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
     
     // Register arrays for pipeline stages
-    logic [DATAWIDTH-1:0] x [ITERATIONS-1:0];
-    logic [DATAWIDTH-1:0] q [ITERATIONS-1:0];
-    logic [DATAWIDTH+1:0] ac [ITERATIONS-1:0];
+    wire [DATAWIDTH-1:0] x [ITERATIONS-1:0];
+    wire [DATAWIDTH-1:0] q [ITERATIONS-1:0];
+    wire [DATAWIDTH+1:0] ac [ITERATIONS-1:0];
 
-    logic [DATAWIDTH-1:0] x_stage [ITERATIONS:0];
-    logic [DATAWIDTH-1:0] q_stage [ITERATIONS:0];
-    logic [DATAWIDTH+1:0] ac_stage [ITERATIONS:0];
+    wire [DATAWIDTH-1:0] x_stage [ITERATIONS:0];
+    wire [DATAWIDTH-1:0] q_stage [ITERATIONS:0];
+    wire [DATAWIDTH+1:0] ac_stage [ITERATIONS:0];
 
-    logic [DATAWIDTH-1:0] rad_reg;
+    wire [DATAWIDTH-1:0] rad_reg;
 
     genvar i, j;
 
-    logic valid [STAGE_MASK_WIDTH-1:0];
+    wire valid [STAGE_MASK_WIDTH-1:0];
 
     assign {ac[0], x[0]} = (valid[0]) ? {{DATAWIDTH{1'b0}}, rad_reg, 2'b0} : '0;
     assign q[0] = '0;

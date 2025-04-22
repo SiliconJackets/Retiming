@@ -49,21 +49,21 @@ module array_divider #(
   localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}};
   // localparam PIPELINE_STAGE_MASK = (INSTANCE_ID == 3) ? 27'b000000000000000000000001001 : (INSTANCE_ID == 2) ? 27'b000000000000000000000001001 : (INSTANCE_ID == 1) ? 27'b000000000000000000000001001 : (INSTANCE_ID == 0) ? 27'b000000000000000000000001001 : {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}}; 
 
-  logic i_valid_r [0:DATAWIDTH+FRAC_BITS];
+  wire i_valid_r [0:DATAWIDTH+FRAC_BITS];
 
-  logic [DATAWIDTH-1+FRAC_BITS:0] D_pipe [0:DATAWIDTH+FRAC_BITS];
-  logic [DATAWIDTH-1:0] B_pipe [0:DATAWIDTH+FRAC_BITS];
+  wire [DATAWIDTH-1+FRAC_BITS:0] D_pipe [0:DATAWIDTH+FRAC_BITS];
+  wire [DATAWIDTH-1:0] B_pipe [0:DATAWIDTH+FRAC_BITS];
 
-  logic [DATAWIDTH-1:0] partial_rem0 = 'b0;
-  logic [DATAWIDTH-1:0] partial_quo0 = 'b0;
+  wire [DATAWIDTH-1:0] partial_rem0 = 'b0;
+  wire [DATAWIDTH-1:0] partial_quo0 = 'b0;
 
-  logic [DATAWIDTH-1:0] partial_rem [0:DATAWIDTH+FRAC_BITS];
-  logic [DATAWIDTH-1:0] partial_quo [0:DATAWIDTH+FRAC_BITS];
+  wire [DATAWIDTH-1:0] partial_rem [0:DATAWIDTH+FRAC_BITS];
+  wire [DATAWIDTH-1:0] partial_quo [0:DATAWIDTH+FRAC_BITS];
 
-  logic [DATAWIDTH-1:0] comb_rem [0:DATAWIDTH+FRAC_BITS];
-  logic [DATAWIDTH-1:0] comb_quo [0:DATAWIDTH+FRAC_BITS];
+  wire [DATAWIDTH-1:0] comb_rem [0:DATAWIDTH+FRAC_BITS];
+  wire [DATAWIDTH-1:0] comb_quo [0:DATAWIDTH+FRAC_BITS];
   
-  logic [DATAWIDTH-1:0] Q_out_calc, R_out_calc;
+  wire [DATAWIDTH-1:0] Q_out_calc, R_out_calc;
 
   generate
       for (genvar i = 0; i < DATAWIDTH + FRAC_BITS; i = i + 1) begin : comb_stage_loop

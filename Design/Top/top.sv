@@ -146,8 +146,8 @@ generate
       assign C_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, C};
       assign D_dividend = {{(2*DATAWIDTH+2-DATAWIDTH){1'b0}}, D};
   end else begin
-    logic [DATAWIDTH*4-1:0] stage_dividend_data [0:TOTAL_PIPELINE_STAGES-1];
-    logic [DATAWIDTH-1:0] A_stage, B_stage, C_stage, D_stage;
+    wire [DATAWIDTH*4-1:0] stage_dividend_data [0:TOTAL_PIPELINE_STAGES-1];
+    wire [DATAWIDTH-1:0] A_stage, B_stage, C_stage, D_stage;
     for (genvar s = 0; s < TOTAL_PIPELINE_STAGES; s++) begin
       logic [4*DATAWIDTH-1:0] input_stage, output_stage;
 
