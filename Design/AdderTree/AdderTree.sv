@@ -25,13 +25,13 @@ module adder_tree #(
 );
 
   localparam int NUM_STAGES = $clog2(NUM_INPUTS - 1) + 1;
-  localparam STAGE_MASK_WIDTH = NUM_STAGES + 1;
+  localparam STAGE_MASK_WIDTH = NUM_STAGES;
   localparam PIPELINE_STAGE_MASK = {{STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}}, {NUM_PIPELINE_STAGES{1'b1}}}; 
 
-  logic [DATAWIDTH+5:0] stage_data [0:NUM_STAGES][0:NUM_INPUTS-1];
-  logic [DATAWIDTH+5:0] comb_result [0:NUM_STAGES][0:(NUM_INPUTS+1)/2];
+  wire [DATAWIDTH+5:0] stage_data [0:NUM_STAGES][0:NUM_INPUTS-1];
+  wire [DATAWIDTH+5:0] comb_result [0:NUM_STAGES][0:(NUM_INPUTS+1)/2];
   
-  logic valid_r [0:NUM_STAGES];
+  wire valid_r [0:NUM_STAGES];
 
   // Generate pipeline stages
   generate

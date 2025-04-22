@@ -26,11 +26,11 @@ module array_multiplier #(
   localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
   logic [DATAWIDTH-1:0] A_reg, B_reg,A_reg_wire, B_reg_wire;
 
-  logic [DATAWIDTH*DATAWIDTH-1:0] P [DATAWIDTH:0];
-  logic [DATAWIDTH-2:0] C [2*DATAWIDTH-2:0];
-  logic [DATAWIDTH-3:0] S [2*DATAWIDTH-3:0];
-  logic [2*DATAWIDTH-1:0] Z [2*DATAWIDTH:0];
-  logic valid [STAGE_MASK_WIDTH-1];
+  wire [DATAWIDTH*DATAWIDTH-1:0] P [DATAWIDTH:0];
+  wire [DATAWIDTH-2:0] C [2*DATAWIDTH-2:0];
+  wire [DATAWIDTH-3:0] S [2*DATAWIDTH-3:0];
+  wire [2*DATAWIDTH-1:0] Z [2*DATAWIDTH:0];
+  wire valid [STAGE_MASK_WIDTH-1];
 
   genvar i, j;
 

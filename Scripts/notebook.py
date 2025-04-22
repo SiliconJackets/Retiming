@@ -10,12 +10,18 @@ import copy
 import shutil
 import subprocess
 import random 
+import argparse
 
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
 load_dotenv(".env")
 
+
+# Added command-line argument parsing
+parser = argparse.ArgumentParser(description='Run the pipeline adjustment algorithm with optional clock period increase.')
+parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
+args = parser.parse_args()
 
 '''
 CONFIGURATIONS
@@ -24,6 +30,7 @@ CONFIGURATIONS
 cwd_path = os.getcwd()
 ## Design Modules
 
+'''
 top_module = ["top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
@@ -31,18 +38,20 @@ design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/SquareRoot/squareroot.sv",
                  f"{cwd_path}/../Design/Top/top.sv"] 
 '''
-top_module = ["array_multiplier_top"]
-design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", f"{cwd_path}/../Design/Multiplier/array_multiplier_top.sv"]
-'''
+top_module = ["top_mult_addertree"]
+design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv", 
+                f"{cwd_path}/../Design/AdderTree/AdderTree.sv",
+                f"{cwd_path}/../Design/Top_mult_addertree/top_mult_addertree.sv"]
+
 ## Library Modules
 lib_modules = ["pipeline_stage"]
 lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_modules]
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 85.0  # Working Clock Period
+clock_period = 4.7  # Working Clock Period
 ## Number of iterations for the algorithm
-N_iterations = 1
+N_iterations = 50
 
 FILES = [path for path in design_paths + lib_paths if path]
 ## No changes bellow this line ###
@@ -204,7 +213,7 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
                 endpoint_as_startpoint = pipeline
             if startpoint_as_endpoint != None and endpoint_as_startpoint != None:  
                 break
-
+        
         if startpoint_as_endpoint["slack"] >= endpoint_as_startpoint["slack"]:
             pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
             if success:
@@ -336,7 +345,8 @@ def remove_duplicates_keep_lowest_slack(data):
 def the_algorithm(condition, telemetry):
     # Get Data
     iterations = telemetry["iterations"]
-    metrics = TimingRptParser(f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt")
+    metrics = TimingRptParser([f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt" ,
+                                f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/min.rpt" ])
     instance_details = metrics.get_instance_details() 
     simplified = remove_duplicates_keep_lowest_slack(instance_details)
 
@@ -373,7 +383,7 @@ def the_algorithm(condition, telemetry):
                 print("Kill Condition Met: Register to Output that is not closest")
 
     if data_hash in temp_telemetry["attempted_pipeline_combinations"]:
-        if temp_telemetry["kill_count"] >= 3:
+        if temp_telemetry["kill_count"] >= 5:
             temp_telemetry["kill"] = True
             return temp_telemetry
         temp_telemetry["kill_count"] += 1
@@ -407,7 +417,7 @@ def the_algorithm(condition, telemetry):
         print("Slack:", data["slack"])
         print("Violations:", data["violated"])
 
-        if data["startpoint"].instance_id in changed_modules or data["endpoint"].instance_id in changed_modules:
+        if data['startpoint'].instance_name in changed_modules or data['endpoint'].instance_name in changed_modules:
             print("Already Modified This Iteration")
             print("----------------")
             continue
@@ -425,10 +435,10 @@ def the_algorithm(condition, telemetry):
             
             if pm1 != data["startpoint"].pipeline_mask:
                 modify_pipeline_mask(data["startpoint"].instance_id, pm1, module_file_location_startpoint)
-                changed_modules.add(data["startpoint"].instance_id)
+                changed_modules.add(data['startpoint'].instance_name)
             if pm2 != data["endpoint"].pipeline_mask:
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
-                changed_modules.add(data["endpoint"].instance_id)
+                changed_modules.add(data['endpoint'].instance_name)
     print("============================================================")       
     return temp_telemetry
 
@@ -445,7 +455,6 @@ while not flag_stop:
 
         # Dumping raw netlist
         verilog_str = " ".join(FILES)
-        tel_it = telemetry["iterations"]
         yosys_cmd = f'rm -rf ./openlane_run/*yosys* ./openlane_run/*openroad*; mkdir -p ./openlane_run; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
         # Run Yosys comman
         subprocess.run(yosys_cmd, shell=True, check=True)
@@ -467,7 +476,7 @@ while not flag_stop:
             SYNTH_HIERARCHY_MODE="deferred_flatten",
             SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
             SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping
-            SYNTH_STRATEGY="DELAY 1",        #Optimize for timing
+            SYNTH_STRATEGY="DELAY 1", 
             SYNTH_ABC_BUFFERING=True,            # Enable cell buffering
             state_in=State(),
         )
@@ -495,6 +504,7 @@ while not flag_stop:
             telemetry = temp_telemetry
         else:
             print("Timing Passed For nom_ss_100C_1v60")
+            temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
             print(clock_period)
             print(telemetry) 
             flag_stop = True
@@ -502,19 +512,26 @@ while not flag_stop:
         print("============================================================")
         print("One Iteration Completed")
         print("============================================================")
-        # input()
+        #input()
     
     if not flag_stop:
-        # restore_backup_files(backup_files)  # we get a good enough solution and base it on that first.
-        telemetry = temp_telemetry
-        telemetry["attempted_pipeline_combinations"].clear()
-        telemetry["kill_count"] = 0
-        telemetry["kill"] = False
-        clock_period += 2.5
-        print("============================================================")
-        print("Increasing clock by 2.5")
-        print("============================================================")
-        #input("Press Enter To Continue With Increased Clock Period...")
+        if args.increase_clock:
+            # Proceed with increasing clock period
+            telemetry = temp_telemetry
+            telemetry["attempted_pipeline_combinations"].clear()
+            telemetry["kill_count"] = 0
+            telemetry["kill"] = False
+            clock_period += 0.2
+            print("============================================================")
+            print(f"Increasing clock period to {clock_period}")
+            print("============================================================")
+            input("Press Enter To Continue With Increased Clock Period...")
+        else:
+            # Print message and exit if the argument is not provided
+            print("============================================================")
+            print("Make the design choice of either increasing the number of pipeline stages or increasing the clock period.")
+            print("============================================================")
+            break
 
 
 

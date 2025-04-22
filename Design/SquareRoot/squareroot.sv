@@ -38,30 +38,30 @@ module sqrt_int #(
 );
     localparam ITERATIONS = DATAWIDTH >> 1;
 
-    localparam STAGE_MASK_WIDTH = ITERATIONS + 2;
+    localparam STAGE_MASK_WIDTH = ITERATIONS + 1;
     localparam PIPELINE_STAGE_MASK = { {STAGE_MASK_WIDTH-NUM_PIPELINE_STAGES{1'b0}},{NUM_PIPELINE_STAGES{1'b1}} };
     
     // Register arrays for pipeline stages
-    logic [DATAWIDTH-1:0] x [ITERATIONS:0];
-    logic [DATAWIDTH-1:0] q [ITERATIONS:0];
-    logic [DATAWIDTH+1:0] ac [ITERATIONS:0];
+    wire [DATAWIDTH-1:0] x [ITERATIONS-1:0];
+    wire [DATAWIDTH-1:0] q [ITERATIONS-1:0];
+    wire [DATAWIDTH+1:0] ac [ITERATIONS-1:0];
 
-    logic [DATAWIDTH-1:0] x_stage [ITERATIONS:0];
-    logic [DATAWIDTH-1:0] q_stage [ITERATIONS:0];
-    logic [DATAWIDTH+1:0] ac_stage [ITERATIONS:0];
+    wire [DATAWIDTH-1:0] x_stage [ITERATIONS:0];
+    wire [DATAWIDTH-1:0] q_stage [ITERATIONS:0];
+    wire [DATAWIDTH+1:0] ac_stage [ITERATIONS:0];
 
-    logic [DATAWIDTH-1:0] rad_reg;
+    wire [DATAWIDTH-1:0] rad_reg;
 
     genvar i, j;
 
-    logic valid [STAGE_MASK_WIDTH-1:0];
+    wire valid [STAGE_MASK_WIDTH-1:0];
 
     assign {ac[0], x[0]} = (valid[0]) ? {{DATAWIDTH{1'b0}}, rad_reg, 2'b0} : '0;
     assign q[0] = '0;
 
     // Generate intermediate squareroot modules
     generate
-        for (i = 1; i < STAGE_MASK_WIDTH - 1; i = i + 1) begin : sqrt_module
+        for (i = 1; i < STAGE_MASK_WIDTH; i = i + 1) begin : sqrt_module
             sqrt_stage #(
                 .DATAWIDTH(DATAWIDTH)  
             ) stage_inst (
@@ -101,7 +101,7 @@ module sqrt_int #(
 
                 logic [2*DATAWIDTH:0] input_stage, output_stage;
 
-                assign input_stage = {q[ITERATIONS], ac[ITERATIONS][DATAWIDTH+1:2], valid[i-1]};
+                assign input_stage = {q_stage[ITERATIONS], ac_stage[ITERATIONS][DATAWIDTH+1:2], valid[i-1]};
                 assign {root, rem, o_valid} = output_stage;
 
                 pipeline_stage #(
