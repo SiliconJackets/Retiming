@@ -10,12 +10,18 @@ import copy
 import shutil
 import subprocess
 import random 
+import argparse
 
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
 from dotenv import load_dotenv
 load_dotenv(".env")
 
+
+# Added command-line argument parsing
+parser = argparse.ArgumentParser(description='Run the pipeline adjustment algorithm with optional clock period increase.')
+parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
+args = parser.parse_args()
 
 '''
 CONFIGURATIONS
@@ -449,7 +455,6 @@ while not flag_stop:
 
         # Dumping raw netlist
         verilog_str = " ".join(FILES)
-        tel_it = telemetry["iterations"]
         yosys_cmd = f'rm -rf ./openlane_run/*yosys* ./openlane_run/*openroad*; mkdir -p ./openlane_run; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
         # Run Yosys comman
         subprocess.run(yosys_cmd, shell=True, check=True)
@@ -510,17 +515,23 @@ while not flag_stop:
         #input()
     
     if not flag_stop:
-        # restore_backup_files(backup_files)  # we get a good enough solution and base it on that first.
-        telemetry = temp_telemetry
-        telemetry["attempted_pipeline_combinations"].clear()
-        telemetry["kill_count"] = 0
-        telemetry["kill"] = False
-        clock_period += 0.2
-        print("============================================================")
-        print("Increasing clock by 2.5")
-        print("============================================================")
-        #os._exit(0)
-        input("Press Enter To Continue With Increased Clock Period...")
+        if args.increase_clock:
+            # Proceed with increasing clock period
+            telemetry = temp_telemetry
+            telemetry["attempted_pipeline_combinations"].clear()
+            telemetry["kill_count"] = 0
+            telemetry["kill"] = False
+            clock_period += 0.2
+            print("============================================================")
+            print(f"Increasing clock period to {clock_period}")
+            print("============================================================")
+            input("Press Enter To Continue With Increased Clock Period...")
+        else:
+            # Print message and exit if the argument is not provided
+            print("============================================================")
+            print("Make the design choice of either increasing the number of pipeline stages or increasing the clock period.")
+            print("============================================================")
+            break
 
 
 
