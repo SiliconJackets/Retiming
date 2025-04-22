@@ -19,7 +19,7 @@ module adder_tree #(
   input  logic clk,
   input  logic rst,
   input  logic i_valid,
-  input  logic [NUM_INPUTS-1:0][DATAWIDTH-1:0] in_data,
+  input  logic [NUM_INPUTS*DATAWIDTH-1:0] in_data,
   output logic o_valid,
   output logic [DATAWIDTH + $clog2(NUM_INPUTS - 1) - 1:0] sum_reg
 );
@@ -45,7 +45,7 @@ module adder_tree #(
           logic [CUR_INPUTS*OUT_W-1:0] bundle_out;
 
           for (genvar i = 0; i < CUR_INPUTS; i++) begin
-            assign bundle_in[i*OUT_W +: OUT_W] = in_data[i];
+            assign bundle_in[i*OUT_W +: OUT_W] = in_data[i*DATAWIDTH +: DATAWIDTH];
             assign stage_data[0][i] = bundle_out[i*OUT_W +: OUT_W];
           end
 

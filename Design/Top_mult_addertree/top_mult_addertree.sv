@@ -83,11 +83,9 @@ array_multiplier #(
     .o_valid(o_valid_D_mul)
   );
 
-logic [3:0][DATAWIDTH * 2-1:0] adder_in_data;
-assign adder_in_data[0] = A_mul;
-assign adder_in_data[1] = B_mul;
-assign adder_in_data[2] = C_mul;
-assign adder_in_data[3] = D_mul;
+logic [4*DATAWIDTH * 2-1:0] adder_in_data;
+assign adder_in_data = {D_mul,C_mul,B_mul,A_mul};
+
 
 adder_tree #(
   .DATAWIDTH(DATAWIDTH * 2),
