@@ -50,7 +50,7 @@ module AdderSubtractorPipelined #(
 
             pipeline_stage #(
                 .WIDTH($bits(input_stage)),
-                .ENABLE(1)
+                .ENABLE(PIPELINE_STAGE_MASK[i])
             ) pipe_reg (
                 .clk(clk),
                 .rst(rst),
