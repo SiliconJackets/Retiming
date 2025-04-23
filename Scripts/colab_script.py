@@ -85,9 +85,8 @@ while not flag_stop:
         Synthesis = Step.factory.get("Yosys.Synthesis")
         synthesis = Synthesis(
             VERILOG_FILES=FILES,
-            SYNTH_HIERARCHY_MODE="deferred_flatten",
-            SYNTH_ABC_DFF=True,              # Enable flip-flop retiming
-            SYNTH_ABC_USE_MFS3=True,         # Experimental SAT-based remapping
+            SYNTH_NO_FLAT=True,
+            YOSYS_LOG_LEVEL="ERROR",
             SYNTH_STRATEGY="DELAY 1", 
             SYNTH_ABC_BUFFERING=True,            # Enable cell buffering
             state_in=State(),
