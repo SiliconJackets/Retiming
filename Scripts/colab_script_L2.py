@@ -20,6 +20,7 @@ from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 parser = argparse.ArgumentParser(description='Run the pipeline adjustment algorithm with optional clock period increase.')
 parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
 parser.add_argument('--clock-period', type=float, default=20.0, help='Initial clock period to use in the design (in ns).')
+parser.add_argument('--Iterations', type=int, default=50, help='Max Iteration count for the algorithm')
 args = parser.parse_args()
 
 openlane.logging.set_log_level("CRITICAL")
@@ -47,7 +48,7 @@ clock_pin = "clk"
 ## Clock period
 clock_period = args.clock_period  # Working Clock Period
 ## Number of iterations for the algorithm
-N_iterations = 50
+N_iterations = args.Iterations  # Number of iterations for the algorithm
 
 FILES = [path for path in design_paths + lib_paths if path]
 ## No changes bellow this line ###
@@ -141,7 +142,7 @@ while not flag_stop:
         else:
             # Print message and exit if the argument is not provided
             print("============================================================")
-            print("Make the design choice of either increasing the number of pipeline stages or increasing the clock period.")
+            print(f"Make the design choice of either increasing the number of pipeline stages or increasing the current clock period {clock_period}.")
             print("============================================================")
             break
 
