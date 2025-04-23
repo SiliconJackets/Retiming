@@ -145,7 +145,7 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
                     print("Warning: Unable to shift pipeline bit.")
                     return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
     else:
-        if not args.no_slack_assumption:
+        if not no_slack_assumption:
             startpoint_as_endpoint = None
             endpoint_as_startpoint = None
             for pipeline in pipeline_details:

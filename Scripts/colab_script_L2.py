@@ -22,7 +22,6 @@ parser.add_argument('--increase-clock', action='store_true', help='Allow automat
 parser.add_argument('--clock-period', type=float, default=20.0, help='Initial clock period to use in the design (in ns).')
 parser.add_argument('--Iterations', type=int, default=50, help='Max Iteration count for the algorithm')
 parser.add_argument('--naive-config', action='store_true', help='naive configuration to check the clock which design satisfies without any modification')
-parser.add_argument('--no-slack-assumption', action='store_true', help='Disables slack consideration while moving pipeline stages')
 args = parser.parse_args()
 
 openlane.logging.set_log_level("CRITICAL")
@@ -34,7 +33,7 @@ CONFIGURATIONS
 cwd_path = os.getcwd()
 ## Design Modules
 
-
+no_slack_assumption = False
 top_module = ["top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
