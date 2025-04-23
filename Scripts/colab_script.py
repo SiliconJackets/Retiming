@@ -3,6 +3,7 @@ import glob
 from openlane.config import Config
 from openlane.steps import Step
 from openlane.state import State
+import openlane.logging
 
 import os
 import json
@@ -19,6 +20,8 @@ from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 parser = argparse.ArgumentParser(description='Run the pipeline adjustment algorithm with optional clock period increase.')
 parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
 args = parser.parse_args()
+
+openlane.logging.set_log_level("CRITICAL")
 
 '''
 CONFIGURATIONS
@@ -46,7 +49,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 4.7  # Working Clock Period
+clock_period = 5.5  # Working Clock Period
 ## Number of iterations for the algorithm
 N_iterations = 50
 
@@ -71,7 +74,6 @@ while not flag_stop:
         yosys_cmd = f'rm -rf ./openlane_run/*yosys* ./openlane_run/*openroad*; mkdir -p ./openlane_run; yosys -Q -qq -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
         # Run Yosys comman
         subprocess.run(yosys_cmd, shell=True, check=True)
-        print("Yosys ran successfully!")
 
         Config.interactive(
             top_module[0],  # Assume first element of top_module list is the top module
@@ -105,6 +107,9 @@ while not flag_stop:
 
         # Parse Timing Data.
         it = telemetry["iterations"]
+        print("============================================================")
+        print(f"Iteration {it}")
+        print("============================================================")
         openroad_state_path = glob.glob("./openlane_run/*-openroad-*/state_out.json")[0]
         stateout = StateOutMetrics(openroad_state_path)
         if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
@@ -112,7 +117,7 @@ while not flag_stop:
             temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
             if temp_telemetry["kill"]:
                 print("Kill Condition Met")
-                print(temp_telemetry)
+                #print(temp_telemetry)
                 break
             telemetry = temp_telemetry
         else:
@@ -122,9 +127,9 @@ while not flag_stop:
             print(telemetry) 
             flag_stop = True
             break
-        print("============================================================")
-        print("One Iteration Completed")
-        print("============================================================")
+        # print("============================================================")
+        # print("One Iteration Completed")
+        # print("============================================================")
         #input()
     
     if not flag_stop:

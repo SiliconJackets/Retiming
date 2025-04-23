@@ -335,32 +335,32 @@ def the_algorithm(condition, telemetry):
     violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
 
     # Debug Statements
-    print("============================================================")
-    print(f"Input Telemetry: {telemetry}")
-    print(f"Output Telemetry: {temp_telemetry}")
-    print("============================================================")
-    print("ALL REGISTER PATHS")
-    for i in (simplified):
-        print(i)
-    print("============================================================")
-    print("SORTED VIOLATED REGISTER PATHS")
-    for i in (violated_paths):
-        print(i)
-    print("============================================================")
-    print("MODIFIED PATHS")
-    print("----------------")
+    # print("============================================================")
+    # print(f"Input Telemetry: {telemetry}")
+    # print(f"Output Telemetry: {temp_telemetry}")
+    # print("============================================================")
+    # print("ALL REGISTER PATHS")
+    # for i in (simplified):
+    #     print(i)
+    # print("============================================================")
+    # print("SORTED VIOLATED REGISTER PATHS")
+    # for i in (violated_paths):
+    #     print(i)
+    # print("============================================================")
+    # print("MODIFIED PATHS")
+    # print("----------------")
 
     # Modify Files
     changed_modules = set()
     for data in violated_paths:
-        print("Startpoint:", data["startpoint"].instance_id, data["startpoint"].module, data["startpoint"].pipeline_mask, data["startpoint"].pipeline_stage)
-        print("Endpoint:", data["endpoint"].instance_id, data["endpoint"].module, data["endpoint"].pipeline_mask, data["endpoint"].pipeline_stage)
-        print("Slack:", data["slack"])
-        print("Violations:", data["violated"])
+        # print("Startpoint:", data["startpoint"].instance_id, data["startpoint"].module, data["startpoint"].pipeline_mask, data["startpoint"].pipeline_stage)
+        # print("Endpoint:", data["endpoint"].instance_id, data["endpoint"].module, data["endpoint"].pipeline_mask, data["endpoint"].pipeline_stage)
+        # print("Slack:", data["slack"])
+        # print("Violations:", data["violated"])
 
         if data['startpoint'].instance_name in changed_modules or data['endpoint'].instance_name in changed_modules:
-            print("Already Modified This Iteration")
-            print("----------------")
+            # print("Already Modified This Iteration")
+            # print("----------------")
             continue
         else:
             module_file_location_startpoint = file_finder(data["startpoint"].module, design_paths + lib_paths)
@@ -368,17 +368,18 @@ def the_algorithm(condition, telemetry):
 
             pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"], simplified, temp_telemetry)
 
-            print(f"Startpoint File Location: {module_file_location_startpoint}")  
-            print(f"Endpoint File Location: {module_file_location_endpoint}")
-            print(f"Startpoint Pipeline Mask Change:", data["startpoint"].pipeline_mask, "to", pm1)
-            print(f"Endpoint Pipeline Mask Change:", data["endpoint"].pipeline_mask, "to", pm2)
-            print("----------------")
+            # print(f"Startpoint File Location: {module_file_location_startpoint}")  
+            # print(f"Endpoint File Location: {module_file_location_endpoint}")
+            # print(f"Endpoint Pipeline Mask Change:", data["endpoint"].pipeline_mask, "to", pm2)
+            # print("----------------")
             
             if pm1 != data["startpoint"].pipeline_mask:
                 modify_pipeline_mask(data["startpoint"].instance_id, pm1, module_file_location_startpoint)
                 changed_modules.add(data['startpoint'].instance_name)
+                print(f"{data['startpoint'].instance_name} Pipeline Mask Changed from", data["startpoint"].pipeline_mask, "to", pm1)
             if pm2 != data["endpoint"].pipeline_mask:
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
                 changed_modules.add(data['endpoint'].instance_name)
+                print(f"{data['endpoint'].instance_name} Pipeline Mask Changed from", data["endpoint"].pipeline_mask, "to", pm2)
     print("============================================================")       
     return temp_telemetry
