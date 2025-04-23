@@ -137,7 +137,7 @@ while not flag_stop:
             telemetry["attempted_pipeline_combinations"].clear()
             telemetry["kill_count"] = 0
             telemetry["kill"] = False
-            clock_period = round(clock_period + 0.1, 2)
+            clock_period = round(clock_period + 2.5, 2)
             print("============================================================")
             print(f"Increasing clock period to {clock_period}")
             print("============================================================")

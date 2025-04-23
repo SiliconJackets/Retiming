@@ -90,7 +90,7 @@ def shift_pipeline_bit(pipeline_mask, pipeline_stage, left):
     return pipeline_mask, False
 
 
-def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails, pipeline_details: list, telemetry: dict):
+def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetails, pipeline_details: list, telemetry: dict, data_hash: str):
     """
     Generate pipeline mask based on the timing path between startpoint and endpoint.
     
@@ -118,7 +118,7 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
             print("Warning: Unable to shift pipeline bit.")
             return startpoint.pipeline_mask, startpoint.pipeline_stage, None, None
     #  REGISTER to REGISTER
-    if telemetry["kill_count"] > 0:
+    if data_hash in telemetry["attempted_pipeline_combinations"] :
         random_bit = random.randint(0, 1)
         if random_bit == 0:
             pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
@@ -369,7 +369,7 @@ def the_algorithm(condition, telemetry):
             module_file_location_startpoint = file_finder(data["startpoint"].module, design_paths + lib_paths)
             module_file_location_endpoint = file_finder(data["endpoint"].module, design_paths + lib_paths)
 
-            pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"], simplified, temp_telemetry)
+            pm1, _, pm2, _ = generate_pipeline_mask(data["startpoint"], data["endpoint"], simplified, temp_telemetry, data_hash)
 
             # print(f"Startpoint File Location: {module_file_location_startpoint}")  
             # print(f"Endpoint File Location: {module_file_location_endpoint}")
