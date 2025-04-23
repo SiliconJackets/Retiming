@@ -21,6 +21,7 @@ parser = argparse.ArgumentParser(description='Run the pipeline adjustment algori
 parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
 parser.add_argument('--clock-period', type=float, default=20.0, help='Initial clock period to use in the design (in ns).')
 parser.add_argument('--Iterations', type=int, default=50, help='Max Iteration count for the algorithm')
+parser.add_argument('--naive-config', action='store_true', help='naive configuration to check the clock which design satisfies without any modification')
 args = parser.parse_args()
 
 openlane.logging.set_log_level("CRITICAL")
@@ -116,14 +117,15 @@ while not flag_stop:
         stateout = StateOutMetrics(openroad_state_path)
         if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
             print("Timing Violated For nom_ss_100C_1v60")
-            temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
-            if temp_telemetry["kill"]:
-                print("Kill Condition Met")
-                #print(temp_telemetry)
-                break
-            telemetry = temp_telemetry
+            if not args.naive_config:
+                temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
+                if temp_telemetry["kill"]:
+                    print("Kill Condition Met")
+                    #print(temp_telemetry)
+                    break
+                telemetry = temp_telemetry
         else:
-            print("Timing Passed For nom_ss_100C_1v60 for clock period of {clock_period}")
+            print(f"Timing Passed For nom_ss_100C_1v60 for clock period of {clock_period}")
             temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
             flag_stop = True
             break
@@ -135,11 +137,12 @@ while not flag_stop:
     if not flag_stop:
         if args.increase_clock:
             # Proceed with increasing clock period
-            telemetry = temp_telemetry
+            if not args.naive_config:
+                telemetry = temp_telemetry
             telemetry["attempted_pipeline_combinations"].clear()
             telemetry["kill_count"] = 0
             telemetry["kill"] = False
-            clock_period += 0.2
+            clock_period = round(clock_period + 0.1, 2)
             print("============================================================")
             print(f"Increasing clock period to {clock_period}")
             print("============================================================")
