@@ -63,11 +63,11 @@ telemetry = {"attempted_pipeline_combinations":set(), "kill_count":0, "kill":Fal
 backup_files = create_backup_files(design_paths)
 while not flag_stop:
     for iterations in range(N_iterations):
-        print_available_steps()
+        # print_available_steps()
 
         # Dumping raw netlist
         verilog_str = " ".join(FILES)
-        yosys_cmd = f'rm -rf ./openlane_run/*yosys* ./openlane_run/*openroad*; mkdir -p ./openlane_run; yosys -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
+        yosys_cmd = f'rm -rf ./openlane_run/*yosys* ./openlane_run/*openroad*; mkdir -p ./openlane_run; yosys -Q -qq -p "read_verilog -sv {verilog_str}; hierarchy -top {top_module[0]}; proc; write_json ./openlane_run/raw_netlist.json"'
         # Run Yosys comman
         subprocess.run(yosys_cmd, shell=True, check=True)
         print("Yosys ran successfully!")
@@ -144,21 +144,3 @@ while not flag_stop:
             print("============================================================")
             break
 
-
-
-
-
-    '''
-        # Disabled for now
-        if stateout.nom_tt_025C_1v80.metrics["timing__hold__ws"] < 0 or stateout.nom_tt_025C_1v80.metrics["timing__setup__ws"] < 0:
-            print("Timing Violated For nom_tt_025C_1v80")
-            the_algorithm("nom_tt_025C_1v80",  iterations)
-        else:
-            print("Timing Passed For nom_tt_025C_1v80")
-
-        if stateout.nom_ff_n40C_1v95.metrics["timing__hold__ws"] < 0 or stateout.nom_ff_n40C_1v95.metrics["timing__setup__ws"] < 0:
-            print("Timing Violated For nom_ff_n40C_1v95")
-            the_algorithm("nom_ff_n40C_1v95",  iterations)
-        else:
-            print("Timing Passed For nom_ff_n40C_1v95")
-    '''
