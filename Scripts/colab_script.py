@@ -121,10 +121,8 @@ while not flag_stop:
                 break
             telemetry = temp_telemetry
         else:
-            print("Timing Passed For nom_ss_100C_1v60")
+            print("Timing Passed For nom_ss_100C_1v60 for clock period of {clock_period}")
             temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)
-            print(clock_period)
-            print(telemetry) 
             flag_stop = True
             break
         # print("============================================================")
