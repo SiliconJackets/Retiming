@@ -33,7 +33,7 @@ CONFIGURATIONS
 cwd_path = os.getcwd()
 ## Design Modules
 
-no_slack_assumption = False
+no_slack_assumption = True
 top_module = ["top"]
 design_paths = [f"{cwd_path}/../Design/Multiplier/array_multiplier.sv",
                  f"{cwd_path}/../Design/Divider/divider.sv",
