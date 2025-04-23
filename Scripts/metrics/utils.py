@@ -339,10 +339,13 @@ def the_algorithm(condition, telemetry):
     # print(f"Input Telemetry: {telemetry}")
     # print(f"Output Telemetry: {temp_telemetry}")
     # print("============================================================")
-    # print("ALL REGISTER PATHS")
-    # for i in (simplified):
-    #     print(i)
-    # print("============================================================")
+    print("============================================================")
+    print("ALL REGISTER PATHS")
+    print("============================================================")
+    simplified_sorted = sorted(simplified, key=lambda x: x['slack'])
+    for i in (simplified_sorted):
+        print(f"From {i['startpoint'].instance_name} Pipeline stage {i['startpoint'].pipeline_stage} to {i['endpoint'].instance_name} Pipeline stage {i['endpoint'].pipeline_stage} : {i['slack']}")
+    print("============================================================")
     # print("SORTED VIOLATED REGISTER PATHS")
     # for i in (violated_paths):
     #     print(i)
