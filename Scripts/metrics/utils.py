@@ -376,10 +376,10 @@ def the_algorithm(condition, telemetry):
             if pm1 != data["startpoint"].pipeline_mask:
                 modify_pipeline_mask(data["startpoint"].instance_id, pm1, module_file_location_startpoint)
                 changed_modules.add(data['startpoint'].instance_name)
-                print(f"{data['startpoint'].instance_name} Pipeline Mask Changed from", data["startpoint"].pipeline_mask, "to", pm1)
+                print(f"{data['startpoint'].instance_name} Pipeline Mask Changed from", data["startpoint"].pipeline_mask[::-1], "to", pm1[::-1])
             if pm2 != data["endpoint"].pipeline_mask:
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
                 changed_modules.add(data['endpoint'].instance_name)
-                print(f"{data['endpoint'].instance_name} Pipeline Mask Changed from", data["endpoint"].pipeline_mask, "to", pm2)
+                print(f"{data['endpoint'].instance_name} Pipeline Mask Changed from", data["endpoint"].pipeline_mask[::-1], "to", pm2[::-1])
     print("============================================================")       
     return temp_telemetry
