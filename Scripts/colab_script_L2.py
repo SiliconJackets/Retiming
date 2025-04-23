@@ -19,6 +19,7 @@ from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 # Added command-line argument parsing
 parser = argparse.ArgumentParser(description='Run the pipeline adjustment algorithm with optional clock period increase.')
 parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
+parser.add_argument('--clock-period', type=float, default=20.0, help='Initial clock period to use in the design (in ns).')
 args = parser.parse_args()
 
 openlane.logging.set_log_level("CRITICAL")
@@ -44,7 +45,7 @@ lib_paths = [f"{cwd_path}/../Design/lib/{lib_module}.sv" for lib_module in lib_m
 ## Clock pin name
 clock_pin = "clk"
 ## Clock period
-clock_period = 20  # Working Clock Period
+clock_period = args.clock_period  # Working Clock Period
 ## Number of iterations for the algorithm
 N_iterations = 50
 
