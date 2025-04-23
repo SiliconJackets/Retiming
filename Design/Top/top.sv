@@ -1,8 +1,8 @@
 module top #(
-    parameter DATAWIDTH = 8,
-    parameter FRAC_BITS = 8,
+    parameter DATAWIDTH = 4,
+    parameter FRAC_BITS = 4,
     parameter NUM_PIPELINE_STAGES_MUL = 1,    
-    parameter NUM_PIPELINE_STAGES_DIV = 2,    
+    parameter NUM_PIPELINE_STAGES_DIV = 3,    
     parameter NUM_PIPELINE_STAGES_SQRT = 1,    
     parameter NUM_PIPELINE_STAGES_ADDT = 0
 )

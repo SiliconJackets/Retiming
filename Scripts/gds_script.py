@@ -45,7 +45,7 @@ synthesis.start()
 Floorplan = Step.factory.get("OpenROAD.Floorplan")
 
 floorplan = Floorplan(state_in=synthesis.state_out)
-
+floorplan.start()
 TapEndcapInsertion = Step.factory.get("OpenROAD.TapEndcapInsertion")
 
 tdi = TapEndcapInsertion(state_in=floorplan.state_out)
