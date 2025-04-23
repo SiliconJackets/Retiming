@@ -30,7 +30,7 @@ Config.interactive(
     PDK="sky130A",
     CLOCK_PORT="clk",
     CLOCK_NET="clk",
-    CLOCK_PERIOD=10,
+    CLOCK_PERIOD=16,
     PRIMARY_GDSII_STREAMOUT_TOOL="klayout",
 )
 

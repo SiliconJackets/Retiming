@@ -145,17 +145,42 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
                     print("Warning: Unable to shift pipeline bit.")
                     return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
     else:
-        startpoint_as_endpoint = None
-        endpoint_as_startpoint = None
-        for pipeline in pipeline_details:
-            if startpoint == pipeline["endpoint"]:
-                startpoint_as_endpoint = pipeline
-            if endpoint == pipeline["startpoint"]:
-                endpoint_as_startpoint = pipeline
-            if startpoint_as_endpoint != None and endpoint_as_startpoint != None:  
-                break
-        
-        if startpoint_as_endpoint["slack"] >= endpoint_as_startpoint["slack"]:
+        if not args.no_slack_assumption:
+            startpoint_as_endpoint = None
+            endpoint_as_startpoint = None
+            for pipeline in pipeline_details:
+                if startpoint == pipeline["endpoint"]:
+                    startpoint_as_endpoint = pipeline
+                if endpoint == pipeline["startpoint"]:
+                    endpoint_as_startpoint = pipeline
+                if startpoint_as_endpoint != None and endpoint_as_startpoint != None:  
+                    break
+            
+            if startpoint_as_endpoint["slack"] >= endpoint_as_startpoint["slack"]:
+                pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+                if success:
+                    return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+                else:
+                    print("Warning: Unable to shift pipeline bit left. Trying to shift right.")
+                    pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+                    if success:
+                        return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+                    else:
+                        print("Warning: Unable to shift pipeline bit.")
+                        return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+            else:
+                pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
+                if success:
+                    return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
+                else:
+                    print("Warning: Unable to shift pipeline bit right. Trying to shift left.")
+                    pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
+                    if success:
+                        return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
+                    else:
+                        print("Warning: Unable to shift pipeline bit.")
+                        return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
+        else:
             pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
             if success:
                 return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
@@ -167,19 +192,7 @@ def generate_pipeline_mask(startpoint: InstanceDetails, endpoint: InstanceDetail
                 else:
                     print("Warning: Unable to shift pipeline bit.")
                     return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
-        else:
-            pipeline_mask, success = shift_pipeline_bit(endpoint.pipeline_mask, endpoint.pipeline_stage, left=False)
-            if success:
-                return startpoint.pipeline_mask, startpoint.pipeline_stage, pipeline_mask, endpoint.pipeline_stage - 1
-            else:
-                print("Warning: Unable to shift pipeline bit right. Trying to shift left.")
-                pipeline_mask, success = shift_pipeline_bit(startpoint.pipeline_mask, startpoint.pipeline_stage, left=True)
-                if success:
-                    return pipeline_mask, startpoint.pipeline_stage + 1, endpoint.pipeline_mask, endpoint.pipeline_stage
-                else:
-                    print("Warning: Unable to shift pipeline bit.")
-                    return startpoint.pipeline_mask, startpoint.pipeline_stage, endpoint.pipeline_mask, endpoint.pipeline_stage
-    
+
 
 def modify_pipeline_mask(instance_id, custom_mask, file_path):
     """
