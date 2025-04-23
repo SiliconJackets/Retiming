@@ -1,4 +1,5 @@
 import openlane
+import glob
 from openlane.config import Config
 from openlane.steps import Step
 from openlane.state import State
@@ -104,7 +105,8 @@ while not flag_stop:
 
         # Parse Timing Data.
         it = telemetry["iterations"]
-        stateout = StateOutMetrics(f"./openlane_run/{2*it+2}-openroad-staprepnr/state_out.json")
+        openroad_state_path = glob.glob("./openlane_run/*-openroad-*/state_out.json")[0]
+        stateout = StateOutMetrics(openroad_state_path)
         if stateout.nom_ss_100C_1v60.metrics["timing__hold__ws"] < 0 or stateout.nom_ss_100C_1v60.metrics["timing__setup__ws"] < 0:
             print("Timing Violated For nom_ss_100C_1v60")
             temp_telemetry = the_algorithm("nom_ss_100C_1v60",  telemetry)

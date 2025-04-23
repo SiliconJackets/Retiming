@@ -285,9 +285,9 @@ def remove_duplicates_keep_lowest_slack(data):
 
 def the_algorithm(condition, telemetry):
     # Get Data
-    iterations = telemetry["iterations"]
-    metrics = TimingRptParser([f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/max.rpt" ,
-                                f"./openlane_run/{2*iterations+2}-openroad-staprepnr/{condition}/min.rpt" ])
+    openroad_path = glob.glob("./openlane_run/*-openroad-*")[0]
+    metrics = TimingRptParser([f"{openroad_path}/{condition}/max.rpt" ,
+                                f"{openroad_path}/{condition}/min.rpt" ])
     instance_details = metrics.get_instance_details() 
     simplified = remove_duplicates_keep_lowest_slack(instance_details)
 
