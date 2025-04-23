@@ -14,10 +14,6 @@ import argparse
 
 from metrics import InstanceDetails, TimingRptParser, StateOutMetrics
 
-from dotenv import load_dotenv
-load_dotenv(".env")
-
-
 # Added command-line argument parsing
 parser = argparse.ArgumentParser(description='Run the pipeline adjustment algorithm with optional clock period increase.')
 parser.add_argument('--increase-clock', action='store_true', help='Allow automatic clock period increase when timing violations occur.')
@@ -525,7 +521,7 @@ while not flag_stop:
             print("============================================================")
             print(f"Increasing clock period to {clock_period}")
             print("============================================================")
-            input("Press Enter To Continue With Increased Clock Period...")
+            # input("Press Enter To Continue With Increased Clock Period...")
         else:
             # Print message and exit if the argument is not provided
             print("============================================================")
