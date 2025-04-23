@@ -323,14 +323,6 @@ def the_algorithm(condition, telemetry):
                 temp_telemetry["kill"] = True 
                 print("Kill Condition Met: Register to Output that is not closest")
 
-    if data_hash in temp_telemetry["attempted_pipeline_combinations"]:
-        if temp_telemetry["kill_count"] >= 5:
-            temp_telemetry["kill"] = True
-            return temp_telemetry
-        temp_telemetry["kill_count"] += 1
-
-    temp_telemetry["attempted_pipeline_combinations"].add(data_hash)
-
     violated_paths = [item for item in simplified if item["violated"]]
     violated_paths.sort(key=lambda x: x["slack"])  # Sorted by slack
 
@@ -384,5 +376,12 @@ def the_algorithm(condition, telemetry):
                 modify_pipeline_mask(data["endpoint"].instance_id, pm2, module_file_location_endpoint)
                 changed_modules.add(data['endpoint'].instance_name)
                 print(f"{data['endpoint'].instance_name} Pipeline Mask Changed from", data["endpoint"].pipeline_mask[::-1], "to", pm2[::-1])
-    print("============================================================")       
+    print("============================================================")  
+    if data_hash in temp_telemetry["attempted_pipeline_combinations"]:
+        if temp_telemetry["kill_count"] >= 5:
+            temp_telemetry["kill"] = True
+            return temp_telemetry
+        temp_telemetry["kill_count"] += 1
+
+    temp_telemetry["attempted_pipeline_combinations"].add(data_hash)     
     return temp_telemetry
